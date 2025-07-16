@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html  data-theme="dark">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="color-scheme" content="light dark">
+    <link rel="stylesheet" type="text/css" href="pico.min.css">
+    <title>EMPIRE Network Setup</title>
+   <style>
+        /* Custom styles for centering the table and character formatting */
+        body {
+            display: flex;
+            flex-direction: column;
+            justify-content: center; /* Center horizontally */
+            align-items: center;     /* Center vertically */
+            min-height: 100vh;       /* Ensure body takes full viewport height */
+            margin: 0;               /* Remove default body margin */
+            background-color: var(--pico-background-color); /* Use Pico's background color */
+        }
+
+        .table-container {
+            max-width: 400px; /* Limit the table's maximum width */
+            width: 90%;      /* Make it responsive up to max-width */
+            margin: auto;    /* Center the container itself */
+            padding: 20px;
+            background-color: var(--pico-card-background-color); /* Use Pico's card background */
+            border-radius: var(--pico-border-radius); /* Use Pico's border radius */
+            box-shadow: var(--pico-box-shadow); /* Add a subtle shadow */
+        }
+
+        table {
+            width: 100%; /* Make the table fill its container */
+            border-collapse: collapse; /* Ensure borders collapse nicely */
+            text-align: center; /* Center text horizontally in cells */
+        }
+
+        table th,
+        table td {
+            padding: 0; /* Remove default cell padding to allow full character size */
+            height: 100px; /* Set a fixed height for cells to make them square-ish */
+            vertical-align: middle; /* Center content vertically in cells */
+            border: 1px solid var(--pico-form-element-border-color); /* Light border for cells */
+        }
+
+        .large-char {
+            font-size: 4em; /* Make the character very large */
+            font-weight: bold;
+            line-height: 1; /* Adjust line-height to prevent extra spacing */
+            display: block; /* Make it a block element to control spacing */
+            padding: 0; /* Ensure no internal padding */
+            margin: 0; /* Ensure no internal margin */
+        }
+
+        /* Optional: Hover effect for cells */
+        table td:hover {
+            background-color: var(--pico-primary-hover);
+            color: var(--pico-inverse);
+            cursor: pointer;
+        }
+    </style> 
+  </head>
+  <body>
+    <script>
+      const ws = new WebSocket('ws://tv-remote.local/ws')
+      ws.onopen = () => {
+        console.log('ws opened on browser')
+        ws.send('hello world')
+      }
+
+      ws.onmessage = (message) => {
+        console.log(`message received`, message.data)
+      }
+
+    </script>
+    <header class="container">
+        <details class="dropdown"> <!-- Removed redundant 'container' class -->
+            <summary aria-label="Main Menu"> <!-- Added aria-label for accessibility -->
+                <span style="font-size: 1.5em;">≡</span> <!-- Used span instead of h1 -->
+                Menu <!-- Added text label for clarity -->
+            </summary>
+            <ul>
+                <li><a href="#">Solid</a></li>
+                <li><a href="#">Liquid</a></li>
+                <li><a href="#">Gas</a></li>
+                <li><a href="#">Plasma</a></li>
+            </ul>
+        </details>
+    </header>
+ 
+
+<main class="container">
+  <div class="container">    
+     <h1>REMOTE ACCESS</h1>
+    <p>to your television</p>
+   </div>
+
+      <section class="table-container">
+        <table>
+
+          <tbody>
+            <tr>
+              <td>&nbsp;</td>
+              <!--<td><div class="big-icon">⏫</div></td>-->
+              <td><span class="large-char" alt="faster">⏫</span></td>
+              <td>&nbsp;</td>
+            </tr>
+            <tr>
+
+              <td><span class="large-char" alt="previous movie">⏮</span></td>
+              <td><span class="large-char" alt="play/pause">⏯</span></td>
+              <td><span class="large-char" alt="next movie">⏭</span></td>
+            </tr>
+            <tr>
+              <td>&nbsp;</td>
+              <td><span class="large-char" alt="slower">⏬</span></td>
+              <td>&nbsp;</td>
+            </tr>
+
+          </tbody>
+        </table>
+      </section>
+
+    </main>
+    <footer class="container">foot</footer>
+  </body>
+</html>
+
+
+<!--
+<svg width="100mm" height="100mm" viewBox="0 0 100 100" version="1.1" id="svg1">
+  <g id="layer1"><path style="fill:none;stroke:#000000;stroke-width:15;stroke-linecap:round;stroke-linejoin:miter;stroke-opacity:1;stroke-dasharray:none"       d="M 15.0,25.0 H 85.0"
+       id="path1" />
+    <path style="fill:none;stroke:#000000;stroke-width:15;stroke-linecap:round;stroke-linejoin:miter;stroke-dasharray:none;stroke-opacity:1"
+       d="M 15.0,50.0 H 85.0"
+       id="path1-3" />
+    <path style="fill:none;stroke:#000000;stroke-width:15;stroke-linecap:round;stroke-linejoin:miter;stroke-dasharray:none;stroke-opacity:1"
+       d="M 15.0,75.0 H 85.0"
+       id="path1-3-1" /></g></svg>
+-->

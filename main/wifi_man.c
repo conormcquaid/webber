@@ -50,8 +50,8 @@ WiFiCredBlob* pCredentials;
 #define WIFI_FAIL_BIT      BIT1
 
 /* AP Configuration */
-#define WIFI_AP_SSID_PREFIX     "emp-"
-//#define WIFI_AP_SSID_PREFIX     "Empire-"
+//#define WIFI_AP_SSID_PREFIX     "emp-"
+#define WIFI_AP_SSID_PREFIX     "Empire-"
 #define WIFI_AP_PASSWD          "goldenmean"
 #define WIFI_CHANNEL            6
 #define MAX_STA_CONN            4
@@ -91,6 +91,7 @@ static void wifi_event_handler(void *arg, esp_event_base_t event_base,
 
         wifi_event_ap_staconnected_t *event = (wifi_event_ap_staconnected_t *) event_data;
         ESP_LOGI(TAG_AP, "Station "MACSTR" joined, AID=%d", MAC2STR(event->mac), event->aid);
+
     } else if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_AP_STADISCONNECTED) {
 
         wifi_event_ap_stadisconnected_t *event = (wifi_event_ap_stadisconnected_t *) event_data;
@@ -103,6 +104,20 @@ static void wifi_event_handler(void *arg, esp_event_base_t event_base,
             ESP_LOGI(TAG, "Retrying to connect to Wi-Fi network ...");
             esp_wifi_connect();
         }
+
+
+    } else if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_STA_DISCONNECTED) {
+        wifi_event_sta_disconnected_t *event = (wifi_event_sta_disconnected_t *)event_data;
+        ESP_LOGE(TAG_STA, "Station disconnected, reason: %d", event->reason);
+        if (s_retry_num < STA_MAXIMUM_RETRY) {
+            ESP_LOGI(TAG_STA, "Retrying connection (%d/%d)", s_retry_num + 1, STA_MAXIMUM_RETRY);
+            s_retry_num++;
+            esp_wifi_connect();
+        } else {
+            ESP_LOGE(TAG_STA, "Max retries reached");
+            xEventGroupSetBits(s_wifi_event_group, WIFI_FAIL_BIT);
+        }
+   
 
 
 
@@ -178,15 +193,15 @@ esp_netif_t *wifi_init_softap(void)
         },
     };
     bzero(&wifi_ap_config.ap.ssid, 32);
-    //       snprintf((char*)wifi_ap_config.ap.ssid, 32, "%s%08lx", WIFI_AP_SSID_PREFIX, hmac_key[0]);
-snprintf((char*)wifi_ap_config.ap.ssid, 32, "%s1", WIFI_AP_SSID_PREFIX);
+    snprintf((char*)wifi_ap_config.ap.ssid, 32, "%s%08lx", WIFI_AP_SSID_PREFIX, hmac_key[0]);
+    //snprintf((char*)wifi_ap_config.ap.ssid, 32, "%s1", WIFI_AP_SSID_PREFIX);
     wifi_ap_config.ap.ssid_len = strlen((char*)wifi_ap_config.ap.ssid);
 
     if (wifi_ap_config.ap.ssid_len == 0) {
         wifi_ap_config.ap.authmode = WIFI_AUTH_OPEN;
     }
 
-    // done previously : ESP_ERROR_CHECK(esp_wifi_set_config(WIFI_IF_AP, &wifi_ap_config));
+    ESP_ERROR_CHECK(esp_wifi_set_config(WIFI_IF_AP, &wifi_ap_config));
 
     ESP_LOGI(TAG_AP, "wifi_init_softap finished. SSID:%s password:%s channel:%d",
              wifi_ap_config.ap.ssid, WIFI_AP_PASSWD, WIFI_CHANNEL);
@@ -199,9 +214,6 @@ snprintf((char*)wifi_ap_config.ap.ssid, 32, "%s1", WIFI_AP_SSID_PREFIX);
 /* Initialize wifi station */
 esp_err_t wifi_init_sta(uint8_t ssid[], uint8_t pwd[])
 {
-    //esp_netif_t *esp_netif_sta = 
-    esp_netif_create_default_wifi_sta();
-
     wifi_config_t wifi_sta_config = {
         .sta = {
 
@@ -218,14 +230,19 @@ esp_err_t wifi_init_sta(uint8_t ssid[], uint8_t pwd[])
     };
     memcpy(wifi_sta_config.sta.ssid, ssid, 32);
     memcpy(wifi_sta_config.sta.password, pwd, 64);
+    //wifi_sta_config.sta.ssid_len = strlen((char*)wifi_sta_config.sta.ssid);
 
-    ESP_ERROR_CHECK(esp_wifi_set_config(WIFI_IF_STA, &wifi_sta_config) );
+    esp_err_t err = esp_wifi_set_config(WIFI_IF_STA, &wifi_sta_config);
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to set WiFi config: %s", esp_err_to_name(err));
+        return err;
+    }
 
     EventBits_t bits = xEventGroupWaitBits(s_wifi_event_group,
         WIFI_CONNECTED_BIT | WIFI_FAIL_BIT,
         pdFALSE,
         pdFALSE,
-        portMAX_DELAY);
+        pdMS_TO_TICKS(10000));
 
 
     if (bits & WIFI_CONNECTED_BIT) {
@@ -272,6 +289,10 @@ void wifi_sta_scan(){
         remove_wifi_creds();
         esp_restart();
     }
+
+
+    esp_netif_create_default_wifi_sta();
+
     // match AP to credentials
     for(int i = 0; i< nRec; i++){
 
@@ -369,9 +390,9 @@ void wifi_manager_task( void* nothing){
     start_webserver();
     start_mdns_service();
 
-    TaskHandle_t hWebsocket;
+    //TaskHandle_t hWebsocket;
     
-    xTaskCreate(websocket_task, "websock", 10*1024, NULL, tskIDLE_PRIORITY, &hWebsocket);
+    //xTaskCreate(websocket_task, "websock", 10*1024, NULL, tskIDLE_PRIORITY, &hWebsocket);
 
 
    //wifi_sta_scan(); //

@@ -82,57 +82,86 @@ void start_mdns_service()
     mdns_instance_name_set(MDNS_HOSTNAME);
 }
 
+// // static void wifi_event_handler(void *arg, esp_event_base_t event_base, int32_t event_id, void *event_data) {
+    
+// //     ESP_LOGI(TAG_STA, "Wi-Fi event: %s, ID: %ld", event_base, event_id);
+// //     if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_AP_STACONNECTED) {
+// //         wifi_event_ap_staconnected_t *event = (wifi_event_ap_staconnected_t *)event_data;
+// //         ESP_LOGI(TAG_AP, "Station " MACSTR " joined, AID=%d", MAC2STR(event->mac), event->aid);
+// //     } else if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_AP_STADISCONNECTED) {
+// //         wifi_event_ap_stadisconnected_t *event = (wifi_event_ap_stadisconnected_t *)event_data;
+// //         ESP_LOGI(TAG_AP, "Station " MACSTR " left, AID=%d, reason:%d", MAC2STR(event->mac), event->aid, event->reason);
+// //     } else if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_STA_START) {
+// //         ESP_LOGI(TAG_STA, "Station started");
+// //         esp_wifi_connect();
+// //     } else if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_STA_DISCONNECTED) {
+// //         wifi_event_sta_disconnected_t *event = (wifi_event_sta_disconnected_t *)event_data;
+// //         ESP_LOGE(TAG_STA, "Station disconnected, reason: %d", event->reason);
+// //         if (s_retry_num < STA_MAXIMUM_RETRY) {
+// //             ESP_LOGI(TAG_STA, "Retrying connection (%d/%d)", s_retry_num + 1, STA_MAXIMUM_RETRY);
+// //             s_retry_num++;
+// //             esp_wifi_connect();
+// //         } else {
+// //             ESP_LOGE(TAG_STA, "Max retries reached");
+// //             xEventGroupSetBits(s_wifi_event_group, WIFI_FAIL_BIT);
+// //         }
+// //     } else if (event_base == IP_EVENT && event_id == IP_EVENT_STA_GOT_IP) {
+// //         ip_event_got_ip_t *event = (ip_event_got_ip_t *)event_data;
+// //         ESP_LOGI(TAG_STA, "Got IP: " IPSTR, IP2STR(&event->ip_info.ip));
+// //         s_retry_num = 0;
+// //         xEventGroupSetBits(s_wifi_event_group, WIFI_CONNECTED_BIT);
+// //     }
+// // }
+
+// static void wifi_event_handler(void *arg, esp_event_base_t event_base,
+//                                int32_t event_id, void *event_data)
+// {
+//     if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_AP_STACONNECTED) {
+
+//         wifi_event_ap_staconnected_t *event = (wifi_event_ap_staconnected_t *) event_data;
+//         ESP_LOGI(TAG_AP, "Station "MACSTR" joined, AID=%d", MAC2STR(event->mac), event->aid);
+
+//     } else if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_AP_STADISCONNECTED) {
+
+//         wifi_event_ap_stadisconnected_t *event = (wifi_event_ap_stadisconnected_t *) event_data;
+//         ESP_LOGI(TAG_AP, "Station "MACSTR" left, AID=%d, reason:%d",  MAC2STR(event->mac), event->aid, event->reason);
+
+//         s_retry_num++;
+//         if(s_retry_num > STA_MAXIMUM_RETRY){
+//             xEventGroupSetBits(s_wifi_event_group, WIFI_FAIL_BIT);
+//         }else{
+//             ESP_LOGI(TAG, "Retrying to connect to Wi-Fi network ...");
+//             esp_wifi_connect();
+//         }
 
 
-static void wifi_event_handler(void *arg, esp_event_base_t event_base,
-                               int32_t event_id, void *event_data)
-{
-    if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_AP_STACONNECTED) {
-
-        wifi_event_ap_staconnected_t *event = (wifi_event_ap_staconnected_t *) event_data;
-        ESP_LOGI(TAG_AP, "Station "MACSTR" joined, AID=%d", MAC2STR(event->mac), event->aid);
-
-    } else if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_AP_STADISCONNECTED) {
-
-        wifi_event_ap_stadisconnected_t *event = (wifi_event_ap_stadisconnected_t *) event_data;
-        ESP_LOGI(TAG_AP, "Station "MACSTR" left, AID=%d, reason:%d",  MAC2STR(event->mac), event->aid, event->reason);
-
-        s_retry_num++;
-        if(s_retry_num > STA_MAXIMUM_RETRY){
-            xEventGroupSetBits(s_wifi_event_group, WIFI_FAIL_BIT);
-        }else{
-            ESP_LOGI(TAG, "Retrying to connect to Wi-Fi network ...");
-            esp_wifi_connect();
-        }
-
-
-    } else if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_STA_DISCONNECTED) {
-        wifi_event_sta_disconnected_t *event = (wifi_event_sta_disconnected_t *)event_data;
-        ESP_LOGE(TAG_STA, "Station disconnected, reason: %d", event->reason);
-        if (s_retry_num < STA_MAXIMUM_RETRY) {
-            ESP_LOGI(TAG_STA, "Retrying connection (%d/%d)", s_retry_num + 1, STA_MAXIMUM_RETRY);
-            s_retry_num++;
-            esp_wifi_connect();
-        } else {
-            ESP_LOGE(TAG_STA, "Max retries reached");
-            xEventGroupSetBits(s_wifi_event_group, WIFI_FAIL_BIT);
-        }
+//     } else if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_STA_DISCONNECTED) {
+//         wifi_event_sta_disconnected_t *event = (wifi_event_sta_disconnected_t *)event_data;
+//         ESP_LOGE(TAG_STA, "Station disconnected, reason: %d", event->reason);
+//         if (s_retry_num < STA_MAXIMUM_RETRY) {
+//             ESP_LOGI(TAG_STA, "Retrying connection (%d/%d)", s_retry_num + 1, STA_MAXIMUM_RETRY);
+//             s_retry_num++;
+//             esp_wifi_connect();
+//         } else {
+//             ESP_LOGE(TAG_STA, "Max retries reached");
+//             xEventGroupSetBits(s_wifi_event_group, WIFI_FAIL_BIT);
+//         }
    
 
 
 
-    } else if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_STA_START) {
+//     } else if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_STA_START) {
 
-        esp_wifi_connect();
-        ESP_LOGI(TAG_STA, "Station started");
-    } else if (event_base == IP_EVENT && event_id == IP_EVENT_STA_GOT_IP) {
+//         esp_wifi_connect();
+//         ESP_LOGI(TAG_STA, "Station started");
+//     } else if (event_base == IP_EVENT && event_id == IP_EVENT_STA_GOT_IP) {
 
-        ip_event_got_ip_t *event = (ip_event_got_ip_t *) event_data;
-        ESP_LOGI(TAG_STA, "Got IP:" IPSTR, IP2STR(&event->ip_info.ip));
-        s_retry_num = 0;
-        xEventGroupSetBits(s_wifi_event_group, WIFI_CONNECTED_BIT);
-    }
-}
+//         ip_event_got_ip_t *event = (ip_event_got_ip_t *) event_data;
+//         ESP_LOGI(TAG_STA, "Got IP:" IPSTR, IP2STR(&event->ip_info.ip));
+//         s_retry_num = 0;
+//         xEventGroupSetBits(s_wifi_event_group, WIFI_CONNECTED_BIT);
+//     }
+// }
 
 void scan(char* APs[], int* nAPs){
 
@@ -170,11 +199,9 @@ void scan(char* APs[], int* nAPs){
 }
 
 /* Initialize soft AP */
-esp_netif_t *wifi_init_softap(void)
+esp_err_t *wifi_init_softap(void)
 {
-    esp_netif_t *esp_netif_ap = esp_netif_create_default_wifi_ap();
-
-    // grab unique key: available on S3 only
+        // grab unique key: available on S3 only
     uint32_t hmac_key[4];
     esp_err_t err = esp_efuse_read_field_blob(ESP_EFUSE_OPTIONAL_UNIQUE_ID, &hmac_key, 16 * 8);
     if (err != ESP_OK) {
@@ -208,7 +235,7 @@ esp_netif_t *wifi_init_softap(void)
 
     connectionStatus |= CAPTIVE_PORTAL;
 
-    return esp_netif_ap;
+    return ESP_OK;
 }
 
 /* Initialize wifi station */
@@ -238,30 +265,34 @@ esp_err_t wifi_init_sta(uint8_t ssid[], uint8_t pwd[])
         return err;
     }
 
-    EventBits_t bits = xEventGroupWaitBits(s_wifi_event_group,
-        WIFI_CONNECTED_BIT | WIFI_FAIL_BIT,
-        pdFALSE,
-        pdFALSE,
-        pdMS_TO_TICKS(10000));
 
 
-    if (bits & WIFI_CONNECTED_BIT) {
-        ESP_LOGI(TAG, "----connected to ap SSID:%s password:%s",
-                 ssid, pwd);
+    return ESP_OK;
 
-                 return ESP_OK;
-
-    } else if (bits & WIFI_FAIL_BIT) {
-        ESP_LOGI(TAG, "----Failed to connect to SSID:%s, password:%s",
-                 ssid, pwd);
-
-                 return ESP_ERR_ESP_NETIF_INIT_FAILED;
+    // EventBits_t bits = xEventGroupWaitBits(s_wifi_event_group,
+    //     WIFI_CONNECTED_BIT | WIFI_FAIL_BIT,
+    //     pdFALSE,
+    //     pdFALSE,
+    //     pdMS_TO_TICKS(10000));
 
 
-    } else {
-        ESP_LOGE(TAG, "----UNEXPECTED EVENT");
-        return ESP_ERR_ESP_NETIF_INIT_FAILED;
-    }
+    // if (bits & WIFI_CONNECTED_BIT) {
+    //     ESP_LOGI(TAG, "----connected to ap SSID:%s password:%s",
+    //              ssid, pwd);
+
+    //              return ESP_OK;
+
+    // } else if (bits & WIFI_FAIL_BIT) {
+    //     ESP_LOGI(TAG, "----Failed to connect to SSID:%s, password:%s",
+    //              ssid, pwd);
+
+    //              return ESP_ERR_ESP_NETIF_INIT_FAILED;
+
+
+    // } else {
+    //     ESP_LOGE(TAG, "----UNEXPECTED EVENT");
+    //     return ESP_ERR_ESP_NETIF_INIT_FAILED;
+    // }
 
 }
 
@@ -293,24 +324,26 @@ void wifi_sta_scan(){
 
     esp_netif_create_default_wifi_sta();
 
-    // match AP to credentials
-    for(int i = 0; i< nRec; i++){
+    wifi_init_sta((uint8_t*)"NETGEAR06", (uint8_t*)"vastflower863");
 
-        ESP_LOGI(TAG, "Checking ssid %s ", APs[i]);
-        for(int j = 0; j < pCredentials->nCreds; j++){
-            if(0 == memcmp(pCredentials->wifiCreds[j].ssid, APs[i], strlen(APs[i]))){
-                ESP_LOGI(TAG, "SSID match %s %s", pCredentials->wifiCreds[j].ssid, APs[i]);
-                ESP_LOGI(TAG, "Trying ssid %s with pwd %s", (char*)pCredentials->wifiCreds[j].ssid, (char*)pCredentials->wifiCreds[j].pwd);
-                if(ESP_OK == wifi_init_sta(pCredentials->wifiCreds[j].ssid, pCredentials->wifiCreds[j].pwd)){
-                    ESP_LOGI(TAG, "Connected to %s ", (char*)pCredentials->wifiCreds[j].ssid);
-                    connectionStatus |= STATION;
-                    break;
-                }else{
-                    ESP_LOGI(TAG, "No luck with %s and %s", (char*)pCredentials->wifiCreds[j].ssid, (char*)pCredentials->wifiCreds[j].pwd);
-                }
-            }
-        }
-    }
+    // match AP to credentials
+    // for(int i = 0; i< nRec; i++){
+
+    //     ESP_LOGI(TAG, "Checking ssid %s ", APs[i]);
+    //     for(int j = 0; j < pCredentials->nCreds; j++){
+    //         if(0 == memcmp(pCredentials->wifiCreds[j].ssid, APs[i], strlen(APs[i]))){
+    //             ESP_LOGI(TAG, "SSID match %s %s", pCredentials->wifiCreds[j].ssid, APs[i]);
+    //             ESP_LOGI(TAG, "Trying ssid %s with pwd %s", (char*)pCredentials->wifiCreds[j].ssid, (char*)pCredentials->wifiCreds[j].pwd);
+    //             if(ESP_OK == wifi_init_sta(pCredentials->wifiCreds[j].ssid, pCredentials->wifiCreds[j].pwd)){
+    //                 ESP_LOGI(TAG, "Connected to %s ", (char*)pCredentials->wifiCreds[j].ssid);
+    //                 connectionStatus |= STATION;
+    //                 break;
+    //             }else{
+    //                 ESP_LOGI(TAG, "No luck with %s and %s", (char*)pCredentials->wifiCreds[j].ssid, (char*)pCredentials->wifiCreds[j].pwd);
+    //             }
+    //         }
+    //     }
+    // }
 
 }
 
@@ -325,86 +358,252 @@ void wifi_sta_connect(){
     // b/c this triggers WIFI_EVENT_STA_START, enev though only AP segment is configured
     //scan(APs, &nRec);
 
-    esp_err_t et = load_wifi_creds(&pCredentials);
-    if(ESP_OK != et){
-        ESP_LOGI(TAG, "Resetting wifi credentials and restarting. Error: %d\n", et);
-        remove_wifi_creds();
-        esp_restart();
-    }
-    if(pCredentials->nCreds == 0){
-        ESP_LOGI(TAG, "No credentials found\n");
-        return;
-    }
-    // match AP to credentials
-    for(int j = 0; j < pCredentials->nCreds; j++){
-            
-        ESP_LOGI(TAG, "Trying ssid %s with pwd %s", (char*)pCredentials->wifiCreds[j].ssid, (char*)pCredentials->wifiCreds[j].pwd);
-        if(ESP_OK == wifi_init_sta(pCredentials->wifiCreds[j].ssid, pCredentials->wifiCreds[j].pwd)){
+    wifi_init_sta((uint8_t*)"NETGEAR06", (uint8_t*)"vastflower863");
 
-            ESP_LOGI(TAG, "Successful connection to %s", (char*)pCredentials->wifiCreds[j].ssid);
+    // esp_err_t et = load_wifi_creds(&pCredentials);
+    // if(ESP_OK != et){
+    //     ESP_LOGI(TAG, "Resetting wifi credentials and restarting. Error: %d\n", et);
+    //     remove_wifi_creds();
+    //     esp_restart();
+    // }
+    // if(pCredentials->nCreds == 0){
+    //     ESP_LOGI(TAG, "No credentials found\n");
+    //     return;
+    // }
+    // // match AP to credentials
+    // for(int j = 0; j < pCredentials->nCreds; j++){
+            
+    //     ESP_LOGI(TAG, "Trying ssid %s with pwd %s", (char*)pCredentials->wifiCreds[j].ssid, (char*)pCredentials->wifiCreds[j].pwd);
+    //     if(ESP_OK == wifi_init_sta(pCredentials->wifiCreds[j].ssid, pCredentials->wifiCreds[j].pwd)){
+
+    //         ESP_LOGI(TAG, "Successful connection to %s", (char*)pCredentials->wifiCreds[j].ssid);
                     
-            connectionStatus |= STATION;
-            break;
-        }else{
-            ESP_LOGI(TAG, "No luck with %s and %s", (char*)pCredentials->wifiCreds[j].ssid, (char*)pCredentials->wifiCreds[j].pwd);
+    //         connectionStatus |= STATION;
+    //         break;
+    //     }else{
+    //         ESP_LOGI(TAG, "No luck with %s and %s", (char*)pCredentials->wifiCreds[j].ssid, (char*)pCredentials->wifiCreds[j].pwd);
+    //     }
+    // }
+}
+
+// void wifi_manager_task( void* nothing){
+
+//     // setup
+//     ESP_ERROR_CHECK(nvs_flash_init());   
+
+//     // Initialize networking stack
+//     ESP_ERROR_CHECK(esp_netif_init());    
+//     // Create default event loop needed by the  main app
+//     ESP_ERROR_CHECK(esp_event_loop_create_default());
+
+//     esp_netif_t *esp_netif_ap =  esp_netif_create_default_wifi_ap();
+//     esp_netif_t *esp_netif_sta = esp_netif_create_default_wifi_sta();
+
+//     wifi_init_config_t cfg = WIFI_INIT_CONFIG_DEFAULT();
+//     ESP_ERROR_CHECK(esp_wifi_init(&cfg));
+
+//     s_wifi_event_group = xEventGroupCreate();
+
+//     /* Register Event handler */
+//     ESP_ERROR_CHECK(esp_event_handler_instance_register(WIFI_EVENT, ESP_EVENT_ANY_ID,    &wifi_event_handler, NULL, NULL));
+//     ESP_ERROR_CHECK(esp_event_handler_instance_register(IP_EVENT,   IP_EVENT_STA_GOT_IP, &wifi_event_handler, NULL, NULL));
+
+
+//     ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_APSTA));
+//     // TODO: implications?    
+//     ESP_ERROR_CHECK(esp_wifi_set_storage(WIFI_STORAGE_RAM));
+
+    
+//     wifi_init_softap();
+    
+//     wifi_sta_connect();
+
+//     ESP_ERROR_CHECK(esp_wifi_start());
+
+//     esp_wifi_connect();  // start STA explicitly
+
+//     start_webserver();
+//     start_mdns_service();
+
+//     //TaskHandle_t hWebsocket;
+    
+//     //xTaskCreate(websocket_task, "websock", 10*1024, NULL, tskIDLE_PRIORITY, &hWebsocket);
+
+
+//    //wifi_sta_scan(); //
+//     //    scan(APs,&nRec);   
+
+
+//     while(true){
+
+//         vTaskDelay(20 / portTICK_PERIOD_MS);
+
+//         //if we lose station connection ...
+//         // wifi_sta_scan() again
+
+//     }
+// }
+static void wifi_event_handler(void* arg, esp_event_base_t event_base,
+                                int32_t event_id, void* event_data)
+{
+    if (event_base == WIFI_EVENT) {
+        switch (event_id) {
+            case WIFI_EVENT_STA_START:
+                ESP_LOGI(TAG, "WIFI_EVENT_STA_START: Station mode started, connecting to AP...");
+                esp_wifi_connect(); // Trigger connection attempt
+                break;
+            case WIFI_EVENT_STA_CONNECTED:
+                ESP_LOGI(TAG, "WIFI_EVENT_STA_CONNECTED: Connected to AP SSID:%s", "dummy_access_point");
+                // Note: Channel is now fixed by the AP we connected to.
+                break;
+            case WIFI_EVENT_STA_DISCONNECTED:
+                ESP_LOGI(TAG, "WIFI_EVENT_STA_DISCONNECTED: Disconnected from AP, attempting reconnect...");
+                esp_wifi_connect(); // Attempt to reconnect
+                break;
+            case WIFI_EVENT_AP_START:
+                ESP_LOGI(TAG, "WIFI_EVENT_AP_START: SoftAP started, SSID:%s", "check for true ssid");
+                // Log the actual channel the AP is using (which is dictated by STA)
+                wifi_config_t conf;
+                esp_wifi_get_config(WIFI_IF_AP, &conf);
+                ESP_LOGI(TAG, "AP Channel: %d", conf.ap.channel);
+                break;
+            case WIFI_EVENT_AP_STACONNECTED: {
+                wifi_event_ap_staconnected_t* event = (wifi_event_ap_staconnected_t*) event_data;
+                ESP_LOGI(TAG, "WIFI_EVENT_AP_STACONNECTED: Station " MACSTR " joined, AID=%d",
+                         MAC2STR(event->mac), event->aid);
+                break;
+            }
+            case WIFI_EVENT_AP_STADISCONNECTED: {
+                wifi_event_ap_stadisconnected_t* event = (wifi_event_ap_stadisconnected_t*) event_data;
+                ESP_LOGI(TAG, "WIFI_EVENT_AP_STADISCONNECTED: Station " MACSTR " left, AID=%d",
+                         MAC2STR(event->mac), event->aid);
+                break;
+            }
+            default:
+                ESP_LOGI(TAG, "Unhandled WIFI_EVENT: %ld", event_id);
+                break;
+        }
+    } else if (event_base == IP_EVENT) {
+        switch (event_id) {
+            case IP_EVENT_STA_GOT_IP: {
+                ip_event_got_ip_t* event = (ip_event_got_ip_t*) event_data;
+                ESP_LOGI(TAG, "IP_EVENT_STA_GOT_IP: Got IP address from AP:" IPSTR, IP2STR(&event->ip_info.ip));
+                // You can now use the STA interface for network communication
+                break;
+            }
+            case IP_EVENT_AP_STAIPASSIGNED: { // Optional: Log IP assigned by ESP32's DHCP server
+                 ip_event_ap_staipassigned_t* event = (ip_event_ap_staipassigned_t*) event_data;
+                 ESP_LOGI(TAG, "IP_EVENT_AP_STAIPASSIGNED: Assigned IP " IPSTR " to station", IP2STR(&event->ip));
+                 break;
+             }
+            default:
+                ESP_LOGI(TAG, "Unhandled IP_EVENT: %ld", event_id);
+                break;
         }
     }
 }
+// Function to initialize WiFi in APSTA mode
+void wifi_init_apsta(void)
+{
+    // 1. Initialize NVS
+    esp_err_t ret = nvs_flash_init();
+    if (ret == ESP_ERR_NVS_NO_FREE_PAGES || ret == ESP_ERR_NVS_NEW_VERSION_FOUND) {
+      ESP_ERROR_CHECK(nvs_flash_erase());
+      ret = nvs_flash_init();
+    }
+    ESP_ERROR_CHECK(ret);
 
-void wifi_manager_task( void* nothing){
+    // 2. Initialize TCP/IP Stack
+    ESP_ERROR_CHECK(esp_netif_init());
 
-    // setup
-    ESP_ERROR_CHECK(nvs_flash_init());   
-
-    // Initialize networking stack
-    ESP_ERROR_CHECK(esp_netif_init());    
-    // Create default event loop needed by the  main app
+    // 3. Create Default Event Loop
     ESP_ERROR_CHECK(esp_event_loop_create_default());
 
+    // 4. Create Network Interfaces (Netifs) - *** Create BOTH STA and AP ***
+    esp_netif_t *sta_netif = esp_netif_create_default_wifi_sta();
+    esp_netif_t *ap_netif = esp_netif_create_default_wifi_ap();
+    assert(sta_netif); // Ensure creation was successful
+    assert(ap_netif);
+
+    // 5. Initialize WiFi Stack
     wifi_init_config_t cfg = WIFI_INIT_CONFIG_DEFAULT();
     ESP_ERROR_CHECK(esp_wifi_init(&cfg));
 
-
-
-    scan(APs,&nRec);
-
-    s_wifi_event_group = xEventGroupCreate();
-
-    /* Register Event handler */
-    ESP_ERROR_CHECK(esp_event_handler_instance_register(WIFI_EVENT, ESP_EVENT_ANY_ID,    &wifi_event_handler, NULL, NULL));
-    ESP_ERROR_CHECK(esp_event_handler_instance_register(IP_EVENT,   IP_EVENT_STA_GOT_IP, &wifi_event_handler, NULL, NULL));
-
-
-    // dual mode
-    esp_wifi_set_mode(WIFI_MODE_APSTA);
-
-    // TODO: implications?
-    ESP_ERROR_CHECK(esp_wifi_set_storage(WIFI_STORAGE_RAM));
-
-    //esp_netif_t *esp_netif_ap = 
+    // 6. Register Event Handlers
+    ESP_ERROR_CHECK(esp_event_handler_instance_register(WIFI_EVENT,
+                                                        ESP_EVENT_ANY_ID,
+                                                        &wifi_event_handler,
+                                                        NULL,
+                                                        NULL));
+    ESP_ERROR_CHECK(esp_event_handler_instance_register(IP_EVENT,
+                                                        ESP_EVENT_ANY_ID,
+                                                        &wifi_event_handler,
+                                                        NULL,
+                                                        NULL));
     
-    wifi_init_softap();
+    // grab unique key: available on S3 only
+    uint32_t hmac_key[4];
+    esp_err_t err = esp_efuse_read_field_blob(ESP_EFUSE_OPTIONAL_UNIQUE_ID, &hmac_key, 16 * 8);
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "esp_efuse_read_field_blob failed!");
+    }
 
+
+
+    // 7. Set WiFi Mode to APSTA
+    ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_APSTA));
+
+    // 8. Configure AP and STA Parameters
+    wifi_config_t wifi_config = {
+        .ap = {
+            //.ssid = EXAMPLE_ESP_AP_WIFI_SSID,
+            
+            .channel = 1, // Will be overridden by STA connection channel
+            //.password = EXAMPLE_ESP_AP_WIFI_PASS,
+            .max_connection = MAX_STA_CONN,
+            .authmode = WIFI_AUTH_WPA2_PSK,
+            .pmf_cfg = {
+                    .required = false,
+            },
+        },
+        .sta = {
+            .ssid = "NETGEAR06", 
+            .password = "vastflower863",
+            .scan_method = WIFI_FAST_SCAN, // Adjust as needed
+            .threshold.authmode = WIFI_AUTH_WPA2_PSK, // Adjust based on router security
+             .pmf_cfg = {
+                    .capable = true,
+                    .required = false
+            },
+       },
+    };
+    
+    bzero(&wifi_config.ap.ssid, 32);
+    snprintf((char*)wifi_config.ap.ssid, 32, "%s%08lx", WIFI_AP_SSID_PREFIX, hmac_key[0]);
+    wifi_config.ap.ssid_len = strlen((char*)wifi_config.ap.ssid);// !! fails if ssid is 32 chars!
+
+     // Basic security check for AP password
+    if (strlen((char*)wifi_config.ap.password) == 0) {
+        wifi_config.ap.authmode = WIFI_AUTH_OPEN;
+         ESP_LOGW(TAG, "AP running in OPEN mode (no password)");
+    } else if (strlen((char*)wifi_config.ap.password) < 8) {
+         ESP_LOGE(TAG, "AP password must be at least 8 characters long");
+         // Handle error appropriately - perhaps stop initialization
+         return;
+    }
+
+
+    // 9. Set WiFi Configuration (Applying config for STA implicitly handles AP too in APSTA mode)
+    ESP_ERROR_CHECK(esp_wifi_set_config(WIFI_IF_STA, &wifi_config));
+
+
+    // 10. Start WiFi
     ESP_ERROR_CHECK(esp_wifi_start());
 
-    start_webserver();
-    start_mdns_service();
+    ESP_LOGI(TAG, "wifi_init_apsta finished.");
+    ESP_LOGI(TAG, "Connect to AP SSID: %s Password: %s", wifi_config.ap.ssid, wifi_config.ap.password);
+    ESP_LOGI(TAG, "ESP32 will attempt to connect to STA SSID: %s", wifi_config.sta.ssid);
 
-    //TaskHandle_t hWebsocket;
-    
-    //xTaskCreate(websocket_task, "websock", 10*1024, NULL, tskIDLE_PRIORITY, &hWebsocket);
-
-
-   //wifi_sta_scan(); //
-    wifi_sta_connect();
-
-
-    while(true){
-
-        vTaskDelay(20 / portTICK_PERIOD_MS);
-
-        //if we lose station connection ...
-        // wifi_sta_scan() again
-
-    }
+    // Note: esp_wifi_connect() is called by the WIFI_EVENT_STA_START handler
 }
+

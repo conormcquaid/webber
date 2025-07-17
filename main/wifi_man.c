@@ -556,10 +556,9 @@ void wifi_init_apsta(void)
     // 8. Configure AP and STA Parameters
     wifi_config_t wifi_config = {
         .ap = {
-            //.ssid = EXAMPLE_ESP_AP_WIFI_SSID,
-            
+            .ssid = "tmp", /* will be replaced with real ssid */          
             .channel = 1, // Will be overridden by STA connection channel
-            //.password = EXAMPLE_ESP_AP_WIFI_PASS,
+            .password = "goldenmean",
             .max_connection = MAX_STA_CONN,
             .authmode = WIFI_AUTH_WPA2_PSK,
             .pmf_cfg = {
@@ -591,6 +590,11 @@ void wifi_init_apsta(void)
          // Handle error appropriately - perhaps stop initialization
          return;
     }
+
+    ESP_LOGI(TAG, ">>>>>>AP SSID: %s, Password: %s, Channel: %d",
+             wifi_config.ap.ssid, wifi_config.ap.password, wifi_config.ap.channel);
+    ESP_LOGI(TAG, ">>>>>>STA SSID: %s, Password: %s",
+             wifi_config.sta.ssid, wifi_config.sta.password);
 
 
     // 9. Set WiFi Configuration (Applying config for STA implicitly handles AP too in APSTA mode)

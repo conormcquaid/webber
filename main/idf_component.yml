@@ -16,3 +16,4 @@ dependencies:
   #   public: true
   espressif/mdns: ^1.8.2
   espressif/esp_websocket_client: ^1.4.0
+  espressif/led_strip: ^3.0.1~1

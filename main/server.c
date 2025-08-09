@@ -9,17 +9,125 @@
 #include "esp_http_server.h"
 #include "dns_server.h"
 #include "freertos/semphr.h"
+#include "freertos/queue.h"
 #include "esp_websocket_client.h"
 #include <cJSON.h>
 #include "mdns.h"
 #include "creds.h"
 #include "esp_spiffs.h"
-
+#include "esp_websocket_client.h"
+#include <cJSON.h>
 #include "websock.h"
-
+#include "main.h"
 #include "server.h"
 
 static char* TAG = "--server--";
+
+static httpd_handle_t server_handle = NULL;
+
+#define MAX_WS_CLIENTS 4
+int ws_client[MAX_WS_CLIENTS];
+
+
+void ws_transmit(httpd_req_t* req, char* pj);
+
+esp_err_t ws_handler(httpd_req_t* req){
+
+    if(req->method == HTTP_GET){
+        ESP_LOGI(TAG, "new ws connection");
+        for(int i = 0; i<MAX_WS_CLIENTS; i++){
+            if(ws_client[i] == 0){
+                ws_client[i] = httpd_req_to_sockfd(req);
+                ESP_LOGI(TAG, "ws client %d connected on %d", i, ws_client[i]);
+                //ws_transmit(req, "{\"init\":\"success\"}");
+                return ESP_OK;
+            }
+        }
+        //MAX CLIENTS reached
+        ESP_LOGW(TAG, "Max WS clients reached");
+        return ESP_FAIL;
+    }
+    // not a GET request
+    httpd_ws_frame_t ws_pkt;
+    memset(&ws_pkt, 0, sizeof(ws_pkt));
+    ws_pkt.type = HTTPD_WS_TYPE_TEXT;
+    // get length of the payload
+    esp_err_t ret = httpd_ws_recv_frame(req, &ws_pkt, 0);
+    if(ret != ESP_OK){
+        ESP_LOGE(TAG, "Error receiving WS frame: %d", ret);
+        return ret;
+    }
+    ESP_LOGI(TAG, "Got ws packet length %zu", ws_pkt.len);
+    if(ws_pkt.len){
+        // allocate a buffer for the payload
+        uint8_t* buf = calloc(1, ws_pkt.len + 1);
+        if(!buf){
+            ESP_LOGE(TAG, "Failed to allocate buffer for WS payload");
+            return ESP_ERR_NO_MEM;
+        }
+        ws_pkt.payload = buf;
+        // read the payload
+        ret = httpd_ws_recv_frame(req, &ws_pkt, ws_pkt.len);
+        if(ret != ESP_OK){
+            ESP_LOGE(TAG, "Error receiving WS frame: %d", ret);
+            free(buf);
+            return ret;
+        }
+        buf[ws_pkt.len] = '\0'; // null-terminate the string
+        ESP_LOGI(TAG, "Received WS message: %s", buf);
+
+        //TODO: parsemessage here
+        xQueueSendToBack(qSuperMessage, &buf, 50);
+        //free(buf); // freed in message processor
+    }
+
+    if(ws_pkt.final && ws_pkt.len == 0){
+        // client disconnected
+        ESP_LOGI(TAG, "Client disconnected");
+        int client_fd = httpd_req_to_sockfd(req);
+        for(int i = 0; i<MAX_WS_CLIENTS; i++){
+            if(ws_client[i] == client_fd){
+                ws_client[i] = 0;
+                ESP_LOGI(TAG, "Client %d disconnected on FD %d", i, client_fd);
+                break;
+            }
+        }
+    } 
+
+    return ESP_OK;
+}
+
+void ws_transmit(httpd_req_t* req, char* a_json_msg) {
+    // sending dynamic initializtion message to all connected clients
+    //for(int i = 0; i < MAX_WS_CLIENTS; i++) {
+    //    if(ws_client[i] != 0) {
+            httpd_ws_frame_t ws_pkt;
+            memset(&ws_pkt, 0, sizeof(ws_pkt));
+            ws_pkt.type = HTTPD_WS_TYPE_TEXT;
+            char m[64];
+            ws_pkt.len = snprintf(m, sizeof(m), "{\"hue\":\"%d\"}", get_hue());
+            ws_pkt.payload = (uint8_t*)m;
+            ESP_LOGI(TAG, "Sending message to client %d: %s", 666, ws_pkt.payload);
+            httpd_ws_send_frame(req, &ws_pkt);
+    //    }
+    //}
+}
+
+void ws_notify(char* a_json_msg) {
+    // sending to all connected clients
+    for(int i = 0; i < MAX_WS_CLIENTS; i++) {
+        if(ws_client[i] != 0) {
+            httpd_ws_frame_t ws_pkt;
+            memset(&ws_pkt, 0, sizeof(ws_pkt));
+            ws_pkt.type = HTTPD_WS_TYPE_TEXT;
+            ws_pkt.payload = (uint8_t*)a_json_msg;
+            ws_pkt.len = strlen(a_json_msg);
+            ESP_LOGI(TAG, "Sending message to client socket %d: %s", ws_client[i], ws_pkt.payload);
+            httpd_ws_send_data(server_handle , ws_client[i], &ws_pkt);
+        }
+    }
+}
+
 
 /* Scratch buffer size */
 #define SCRATCH_BUFSIZE  8192
@@ -117,12 +225,7 @@ static esp_err_t captive_post_handler(httpd_req_t *req)
     return ESP_OK;
 }
 
-static const httpd_uri_t cap_post = {
 
-    .uri = "/",
-    .method = HTTP_POST,
-    .handler = captive_post_handler
-};
 
 // HTTP Error (404) Handler - Redirects all requests to the root page
 esp_err_t http_404_error_handler(httpd_req_t *req, httpd_err_code_t err)
@@ -181,6 +284,7 @@ static esp_err_t spiff_serve(httpd_req_t *req)
 {
     const char *filename = req->uri;
 
+
     printf("+ root get with fname %s\n",filename);
 
 
@@ -224,8 +328,32 @@ static esp_err_t spiff_serve(httpd_req_t *req)
 	}
     // End response
     httpd_resp_send_chunk(req, NULL, 0);
+
+    //TODO: check back here
+
+    // client has a page, so let's listen for events
+    //websocket_task();
+
+
     return ESP_OK;
 }
+
+static const httpd_uri_t cap_post = {
+
+    .uri = "/",
+    .method = HTTP_POST,
+    .handler = captive_post_handler
+};
+
+static const httpd_uri_t ws = {
+    .uri = "/ws",
+    .method = HTTP_GET,
+    .handler = ws_handler,
+    .user_ctx = NULL,
+    .is_websocket = true,               // Mandatory: set to `true` to handler websocket protocol
+    .handle_ws_control_frames = false,  // Optional: set to `true` for the handler to receive control packets, too
+        
+};
 
 
 static const httpd_uri_t allget = {
@@ -234,6 +362,8 @@ static const httpd_uri_t allget = {
     .handler   = spiff_serve,
     .user_ctx  = NULL
 };
+
+
 
 httpd_handle_t start_webserver( void )
 {
@@ -261,6 +391,7 @@ httpd_handle_t start_webserver( void )
         // Set URI handlers
         ESP_LOGI(TAG, "Registering URI handlers");
         
+        ESP_ERROR_CHECK(httpd_register_uri_handler(server, &ws));
         ESP_ERROR_CHECK(httpd_register_uri_handler(server, &cap_post));
         ESP_ERROR_CHECK(httpd_register_err_handler(server, HTTPD_404_NOT_FOUND, http_404_error_handler));
         ESP_ERROR_CHECK(httpd_register_uri_handler(server, &allget));
@@ -271,6 +402,16 @@ httpd_handle_t start_webserver( void )
 
     ESP_LOGI(TAG, "Error starting server!");
     return NULL;
+}
+
+void init_webserver(void){
+
+    server_handle = start_webserver();
+    if(server_handle == NULL){
+        ESP_LOGE(TAG, "Failed to start web server");
+    } else {
+        ESP_LOGI(TAG, "Web server started successfully");
+    }
 }
 
 

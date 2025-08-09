@@ -1,0 +1,372 @@
+<!DOCTYPE html>
+<html data-theme="dark">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="color-scheme" content="light dark">
+    <link rel="stylesheet" type="text/css" href="./pico.min.css">
+    <script src="knobs.js"></script>
+    <title>Remote Control</title>
+   <style>
+        /* Custom styles for centering the table and character formatting */
+        body {
+            display: flex;
+            flex-direction: column;
+            justify-content: center; /* Center horizontally */
+            align-items: center;     /* Center vertically */
+            min-height: 100vh;       /* Ensure body takes full viewport height */
+            margin: 0;               /* Remove default body margin */
+            background-color: var(--pico-background-color); /* Use Pico's background color */
+        }
+
+        .table-container {
+            max-width: 400px; /* Limit the table's maximum width */
+            width: 90%;      /* Make it responsive up to max-width */
+            margin: auto;    /* Center the container itself */
+            padding: 20px;
+            background-color: var(--pico-card-background-color); /* Use Pico's card background */
+            border-radius: var(--pico-border-radius); /* Use Pico's border radius */
+            box-shadow: var(--pico-box-shadow); /* Add a subtle shadow */
+        }
+
+        table {
+            width: 100%; /* Make the table fill its container */
+            border-collapse: collapse; /* Ensure borders collapse nicely */
+            text-align: center; /* Center text horizontally in cells */
+        }
+
+        table th,
+        table td {
+            padding: 0; /* Remove default cell padding to allow full character size */
+            height: 100px; /* Set a fixed height for cells to make them square-ish */
+            vertical-align: middle; /* Center content vertically in cells */
+            border: 1px solid var(--pico-form-element-border-color); /* Light border for cells */
+        }
+
+        .large-char {
+            font-size: 4em; /* Make the character very large */
+            font-weight: bold;
+            line-height: 1; /* Adjust line-height to prevent extra spacing */
+            display: block; /* Make it a block element to control spacing */
+            padding: 0; /* Ensure no internal padding */
+            margin: 0; /* Ensure no internal margin */
+        }
+
+        /* Optional: Hover effect for cells */
+        table td:hover {
+            background-color: var(--pico-primary-hover);
+            color: var(--pico-inverse);
+            cursor: pointer;
+        }
+    </style> 
+  </head>
+  <body>
+    <script>
+      
+
+    </script>
+    <header class="container">
+        <details class="dropdown"> <!-- Removed redundant 'container' class -->
+            <summary aria-label="Main Menu"> <!-- Added aria-label for accessibility -->
+                <span style="font-size: 1.5em;">≡</span> <!-- Used span instead of h1 -->
+                Menu <!-- Added text label for clarity -->
+            </summary>
+            <ul>
+                <li><a href="#">Solid</a></li>
+                <li><a href="#">Liquid</a></li>
+                <li><a href="#">Gas</a></li>
+                <li><a href="#">Plasma</a></li>
+            </ul>
+        </details>
+    </header>
+ 
+
+<main class="container">
+      <section class="table-container">
+        <table>
+          <tbody>
+            <tr>
+              <td>&nbsp;</td>
+              <!--<td><div class="big-icon">⏫</div></td>-->
+              <td>
+                  <div class="container"  style="text-align: center;">    
+                  <h1>REMOTE ACCESS</h1>
+                  <p>to your television</p>
+                </div>
+              </td>
+              <td>&nbsp;</td>
+            </tr>
+            <tr>
+
+              <td><span class="large-char" alt="previous movie" data-tooltip="previous" data-placement="left">⏮</span></td>
+              <td><span class="large-char" alt="speed">
+                <canvas id="speedDial" width="200" height="200" ></canvas>
+              </span></td>
+              <td><span class="large-char" alt="next movie" data-tooltip="next" data-placement="right">⏭</span></td>
+            </tr>
+            <tr>
+              <td>&nbsp;</td>
+              <td>&nbsp;</td>
+              <td>&nbsp;</td>
+            </tr>
+
+          </tbody>
+        </table>
+      </section>
+
+      <canvas id="hueCanvas" width="200" height="200" ></canvas>
+      
+      <div class="container">
+      <p>Now playing:</p>
+        <select id="dynamicSelect">
+            <!-- Options will be populated by WebSocket -->
+            <option value="">Loading ...</option>
+        </select>
+
+        <p>Send a message:</p>
+        <button id="button1">Send Message 1</button>
+        <button id="button2">Send Message 2</button>
+
+        <input type="range" class="input-knob"/>
+
+        <p>Adjust Slider:</p>
+        <div class="slider-container">
+            <input type="range" id="speedSlider" min="0" max="360" value="180">
+            <span id="sliderValueDisplay">180</span>
+        </div>
+        <p id="wsStatus">WebSocket Status: Connecting...</p>
+      </div>
+
+    </main>
+    <footer class="container"><!--<img src="./7495726.png">--></footer>
+
+
+
+<!-- END OF HTML -->
+
+
+
+    <script>
+      const wsStatus = document.getElementById('wsStatus');
+      const hc = document.getElementById('hueCanvas');
+      const ws = new WebSocket('ws://' + window.location.host + '/ws');
+      ws.onopen = () => {
+        console.log('ws opened on browser')
+        wsStatus.innerText = 'WebSocket Status: Closed';
+        ws.send(JSON.stringify({ status: 'page loaded' }));
+      }
+
+        ws.onmessage = (event) => {
+            console.log('Message received:', event.data);
+            try {
+                const message = JSON.parse(event.data);
+                if (message.type === 'select_options') {
+
+                    populateSelect(message.options);
+                } else if (message.type === 'status_update') {
+
+                    console.log('Status from ESP32:', message.text);
+                    // You could update a specific status div here
+
+                } else if (message.hue !== undefined) {
+                    console.log('Got hue from ESP32:', message.hue);
+                    // Optionally update slider or display based on echo
+                    const ctx = hc.getContext('2d');
+                    ctx.clearRect(0, 0, hc.width, hc.height); // Clear previous drawing
+                    ctx.fillStyle = `hsl(${message.hue % 360}, 100%, 50%)`; // Use HSL for hue
+                    ctx.fillRect(0, 0, hc.width, hc.height); // Fill the canvas with the hue color
+                }
+            } catch (e) {
+                console.error('Failed to parse WebSocket message:', e);
+            }
+        };
+      
+      ws.onerror = (error) => {
+          console.error('WebSocket error:', error);
+          wsStatus.innerText = 'WebSocket Status: Error!';
+      };
+      ws.onclose = () => {
+          console.log('WebSocket connection closed');
+          wsStatus.innerText = 'WebSocket Status: Closed';
+      };
+
+      const button1 = document.getElementById('button1');
+
+      button1.onclick = () => {
+          if (ws.readyState === WebSocket.OPEN) {
+              ws.send(JSON.stringify({ type: 'button_click', id: 'button1' }));
+              console.log('Sent button1 click');
+          } else {
+              console.warn('WebSocket not open for button1 click');
+          }
+      };
+
+      function set_hue(hue){
+          const ctx = hc.getContext('2d');
+          ctx.clearRect(0, 0, hc.width, hc.height); // Clear previous drawing
+          ctx.fillStyle = `hsl(${hue}, 100%, 50%)`; // Use HSL for hue
+          ctx.fillRect(0, 0, hc.width, hc.height); // Fill the canvas with the hue color
+      }
+      
+
+      const speedDial = document.getElementById('speedDial');
+      var sx, sy;
+      var dialSpeed = 50.0;
+      
+      var adjustDial = false;
+      speedDial.onpointerdown = function(e){
+        e.preventDefault(); // don't scroll parent container
+        sx = e.clientX;
+        sy = e.clientY;
+        adjustDial = true;
+      }
+
+      function renderDial(n){
+        
+        //var thickness = 20;
+        delta = (Math.PI *2) * 0.1;
+        origin =  Math.PI / 2;
+        ε = (Math.PI *2) * 0.01; //delta / 4;
+        
+        const canvas = document.getElementById('speedDial');
+        const ctx = canvas.getContext('2d');
+        ctx.clearRect(0,0,canvas.width,canvas.height);
+
+        //bgc = document.getElementById("body").style.backgroundColor;
+   //     bgc = 'hsl(205, 30%, 15%, 1.0)';
+        bgc = 'hsl(205, 15%, 23%, 1.0)';
+
+// // gradient background
+// const gradient = ctx.createRadialGradient(canvas.width/2, canvas.height/2, 1, canvas.width/2, canvas.height/2, canvas.width);
+// // Add three color stops
+// gradient.addColorStop(0, "gray");
+// gradient.addColorStop(0.5, bgc);
+
+// // Set the fill style and draw a rectangle
+// ctx.fillStyle = gradient;
+// ctx.fillRect(0,0,canvas.width,canvas.height);
+
+
+
+        // thickness of dial
+        thickness = 0.2 * Math.min(canvas.width, canvas.height);
+        radius = 0.3 * Math.min(canvas.width, canvas.height);
+
+        // useful to detect mouse inside dial arc
+        r1 = radius + thickness /2;
+        r2 = radius - thickness/2;
+
+        // arc background
+        ctx.beginPath();
+        ctx.lineWidth = thickness;
+        ctx.strokeStyle = "white";
+        //ctx.arc(canvas.width/2, canvas.height/2, radius, 0.1, (2 * Math.PI - 0.1) , false);
+        ctx.arc(canvas.width/2, canvas.height/2, radius, origin + delta - ε, origin - delta + ε , false);
+        ctx.stroke();
+
+        /// dial indicator thickness reduced by 80% w.r.t. arc b.g.
+        ctx.beginPath();
+        ctx.lineWidth = 0.8 * thickness;
+        ctx.strokeStyle = "black";
+       ctx.arc(canvas.width/2, canvas.height/2, radius, origin + delta, (origin + delta) + (Math.PI * 2 - 2 * delta)* n /100, false);
+      // ctx.arc(canvas.width/2, canvas.height/2, radius, (origin - delta)* n /100, origin + delta, false);
+        ctx.stroke();
+
+        ctx.font = "30px Arial"; // Set your desired font and size
+        ctx.fillStyle = "orange"; // Set your desired text color
+
+        ctx.textAlign = "center";   // Horizontal center
+        ctx.textBaseline = "middle"; // Vertical center
+
+        const text = Math.trunc(n).toString();
+        const x = canvas.width / 2;
+        const y = canvas.height / 2;
+
+        ctx.fillText(text, x, y);
+
+      }
+      var mag;
+      
+      speedDial.onpointermove = function(e){
+
+        if(!adjustDial)return;
+
+        e.preventDefault(); // don't scroll parent container
+        dx = sx - e.clientX;
+        dy = sy - e.clientY;
+        mag = Math.sqrt(dx*dx + dy*dy);
+
+        // y=-x: pt above this line, increase value; below, decrease
+
+        if( (dx > 0 && dy > 0) ||( dx < 0 && dy > 0 && dy > (-1*dx)) || (dx > 0 && dy < 0 && dx > (-1*dy))){
+          mag = -1 * mag;// +ve
+        }else{
+          mag = 1 * mag;
+        }
+        
+
+        //dialSpeed += mag;
+        //if(dialSpeed < 0)dialSpeed = 0;
+        //if(dialSpeed > 100) dialSpeed = 100;
+         n = dialSpeed + mag;
+        if(n < 0) n = 0;
+        if(n > 100) n = 100;       
+        console.log("Mag: "+ mag+" Dial: "+ dialSpeed+" n: "+ n);
+
+
+        renderDial(n);
+      //   theta = Math.atan(dy/dx);
+
+      //   //If x > 0 and y > 0 (Quadrant I), no adjustment is needed.
+      //   if( dx < 0 ){ theta = theta + Math.PI;}else if (dx > 0 && dy < 0 ){ theta = theta + 2* Math.PI;} 
+
+      //   //Special Cases:
+
+      // if(dx == 0 && dy > 0){ theta = Math.PI / 2; }
+      // if(dx == 0 && dy < 0){ theta = -Math.PI/2; }
+      // if(dx == 0 && dy == 0){ mag = 0; theta = 0; }
+      //   console.log("Mag: " + mag + " theta: " + 360 * theta / (2* Math.PI));
+      // 
+      // //TODO: mouse click between r1 and r2, theta between track start and end: set value directly
+
+      }
+
+      speedDial.onpointerup = function(e){
+        adjustDial = false;
+        console.log("dialSpeed = " + dialSpeed);
+      }
+
+      const speedSlider = document.getElementById('speedSlider');
+      speedSlider.oninput = () => {
+          sliderValueDisplay.innerText = speedSlider.value; 
+          set_hue(speedSlider.value);
+          // Send the slider value to the ESP32
+          if (ws.readyState === WebSocket.OPEN) {
+            v = parseInt(speedSlider.value);
+              ws.send(JSON.stringify({ hue : v }));
+              console.log('Sent slider value:', speedSlider.value);
+          } else {
+              console.warn('WebSocket not open for slider value');
+          }
+      };
+      //init
+      renderDial(5);
+      set_hue(speedSlider.value);
+      
+      
+    </script>
+  </body>
+</html>
+
+
+<!--
+<svg width="100mm" height="100mm" viewBox="0 0 100 100" version="1.1" id="svg1">
+  <g id="layer1"><path style="fill:none;stroke:#000000;stroke-width:15;stroke-linecap:round;stroke-linejoin:miter;stroke-opacity:1;stroke-dasharray:none"       d="M 15.0,25.0 H 85.0"
+       id="path1" />
+    <path style="fill:none;stroke:#000000;stroke-width:15;stroke-linecap:round;stroke-linejoin:miter;stroke-dasharray:none;stroke-opacity:1"
+       d="M 15.0,50.0 H 85.0"
+       id="path1-3" />
+    <path style="fill:none;stroke:#000000;stroke-width:15;stroke-linecap:round;stroke-linejoin:miter;stroke-dasharray:none;stroke-opacity:1"
+       d="M 15.0,75.0 H 85.0"
+       id="path1-3-1" /></g></svg>
+-->

@@ -1,0 +1,145 @@
+/*
+ * SPDX-FileCopyrightText: 2010-2022 Espressif Systems (Shanghai) CO LTD
+ *
+ * SPDX-License-Identifier: CC0-1.0
+ */
+
+#include "sdkconfig.h"
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
+#include "freertos/queue.h"
+#include "esp_log.h"
+#include "driver/pulse_cnt.h"
+#include "driver/gpio.h"
+#include "esp_sleep.h"
+#include "main.h"
+#include <math.h>
+#include <stdio.h>
+
+QueueHandle_t qRotor; // notify rotary encoder events externally
+
+
+static const char *TAG = "rotary";
+
+#define EXAMPLE_PCNT_HIGH_LIMIT  4
+#define EXAMPLE_PCNT_LOW_LIMIT  -4
+
+#define ROTOR_EC11_GPIO_A   GPIO_NUM_37
+#define ROTOR_EC11_GPIO_B   GPIO_NUM_38
+#define ROTOR_PUSH_BUTTON   GPIO_NUM_36
+
+static bool example_pcnt_on_reach(pcnt_unit_handle_t unit, const pcnt_watch_event_data_t *edata, void *user_ctx)
+{
+    BaseType_t high_task_wakeup = false;
+    QueueHandle_t queue = (QueueHandle_t)user_ctx;
+    // send event data to queue, from this interrupt callback
+
+    xQueueSendFromISR(queue, &(edata->watch_point_value), &high_task_wakeup);
+    //TODO: clear count??
+    //pcnt_unit_clear_count( unit);
+    return (high_task_wakeup == pdTRUE);
+}
+
+
+void init_rotary_encoder(void* p)
+{
+    // init pins as gpios first
+    gpio_config_t io_conf = {
+        .intr_type = GPIO_INTR_DISABLE,
+        .mode = GPIO_MODE_INPUT,
+        .pin_bit_mask = (1ULL << ROTOR_EC11_GPIO_A) | (1ULL << ROTOR_EC11_GPIO_B) | (1ULL << ROTOR_PUSH_BUTTON),
+        .pull_down_en = GPIO_PULLDOWN_DISABLE,
+        .pull_up_en = GPIO_PULLUP_ENABLE,
+    };
+    ESP_ERROR_CHECK(gpio_config(&io_conf));
+
+    ESP_LOGI(TAG, "install pcnt unit");
+    pcnt_unit_config_t unit_config = {
+        .high_limit = EXAMPLE_PCNT_HIGH_LIMIT,
+        .low_limit = EXAMPLE_PCNT_LOW_LIMIT,
+        .flags.accum_count = false        
+    };
+    pcnt_unit_handle_t pcnt_unit = NULL;
+    ESP_ERROR_CHECK(pcnt_new_unit(&unit_config, &pcnt_unit));
+
+    ESP_LOGI(TAG, "set glitch filter");
+    pcnt_glitch_filter_config_t filter_config = {
+        .max_glitch_ns = 10000,
+    };
+    ESP_ERROR_CHECK(pcnt_unit_set_glitch_filter(pcnt_unit, &filter_config));
+
+    ESP_LOGI(TAG, "install pcnt channels");
+    pcnt_chan_config_t chan_a_config = {
+        .edge_gpio_num = ROTOR_EC11_GPIO_A,
+        .level_gpio_num = ROTOR_EC11_GPIO_B,
+    };
+    pcnt_channel_handle_t pcnt_chan_a = NULL;
+
+    ESP_ERROR_CHECK(pcnt_new_channel(pcnt_unit, &chan_a_config, &pcnt_chan_a));
+
+
+    pcnt_chan_config_t chan_b_config = {
+        .edge_gpio_num = ROTOR_EC11_GPIO_B,
+        .level_gpio_num = ROTOR_EC11_GPIO_A,
+    };
+    pcnt_channel_handle_t pcnt_chan_b = NULL;
+    ESP_ERROR_CHECK(pcnt_new_channel(pcnt_unit, &chan_b_config, &pcnt_chan_b));
+
+    ESP_LOGI(TAG, "set edge and level actions for pcnt channels");
+    ESP_ERROR_CHECK(pcnt_channel_set_edge_action(pcnt_chan_a, PCNT_CHANNEL_EDGE_ACTION_DECREASE, PCNT_CHANNEL_EDGE_ACTION_INCREASE));
+    ESP_ERROR_CHECK(pcnt_channel_set_level_action(pcnt_chan_a, PCNT_CHANNEL_LEVEL_ACTION_KEEP, PCNT_CHANNEL_LEVEL_ACTION_INVERSE));
+    ESP_ERROR_CHECK(pcnt_channel_set_edge_action(pcnt_chan_b, PCNT_CHANNEL_EDGE_ACTION_INCREASE, PCNT_CHANNEL_EDGE_ACTION_DECREASE));
+    ESP_ERROR_CHECK(pcnt_channel_set_level_action(pcnt_chan_b, PCNT_CHANNEL_LEVEL_ACTION_KEEP, PCNT_CHANNEL_LEVEL_ACTION_INVERSE));
+
+     ESP_LOGI(TAG, "add watch points and register callbacks");
+//  //   int watch_points[] = {EXAMPLE_PCNT_LOW_LIMIT, -50, 0, 50, EXAMPLE_PCNT_HIGH_LIMIT};
+      int watch_points[] = {EXAMPLE_PCNT_HIGH_LIMIT, EXAMPLE_PCNT_LOW_LIMIT};
+
+     for (size_t i = 0; i < sizeof(watch_points) / sizeof(watch_points[0]); i++) {
+         ESP_ERROR_CHECK(pcnt_unit_add_watch_point(pcnt_unit, watch_points[i]));
+     }
+     pcnt_event_callbacks_t cbs = {
+         .on_reach = example_pcnt_on_reach
+     };
+     qRotor = xQueueCreate(10, sizeof(int));
+     ESP_ERROR_CHECK(pcnt_unit_register_event_callbacks(pcnt_unit, &cbs, qRotor));
+
+    ESP_LOGI(TAG, "enable pcnt unit");
+    ESP_ERROR_CHECK(pcnt_unit_enable(pcnt_unit));
+    ESP_LOGI(TAG, "clear pcnt unit");
+    ESP_ERROR_CHECK(pcnt_unit_clear_count(pcnt_unit));
+    ESP_LOGI(TAG, "start pcnt unit");
+    ESP_ERROR_CHECK(pcnt_unit_start(pcnt_unit));
+
+#if CONFIG_EXAMPLE_WAKE_UP_LIGHT_SLEEP
+    // EC11 channel output high level in normal state, so we set "low level" to wake up the chip
+    ESP_ERROR_CHECK(gpio_wakeup_enable(ROTOR_EC11_GPIO_A, GPIO_INTR_LOW_LEVEL));
+    ESP_ERROR_CHECK(esp_sleep_enable_gpio_wakeup());
+    ESP_ERROR_CHECK(esp_light_sleep_start());
+#endif
+
+    // qRotor = xQueueCreate(10, sizeof(int));
+
+    // // // Report counter value
+    // static int event_count = 0;
+    // //static int hue = 0;
+    // //static const int hue_increment = 15;
+    // while (1) {
+
+    //     if (xQueueReceive(qtip, &event_count, pdMS_TO_TICKS(1000))) {
+            
+    //         ESP_LOGI(TAG, "Watchpoint event, count: %d", event_count);
+
+    //         xQueueSendToBack(qRotor, &event_count, 50);
+
+    //   //       hue = hue + (event_count < 0 ? -hue_increment : hue_increment);
+
+    //         // ESP_LOGI(TAG, "Hue: %d",hue);
+
+    //         // RGBColor rgbc = hslToRgb(hue, 90, 30);
+
+    //         // xQueueSendToBack(qHue, &rgbc, 50);
+
+    //     }
+    //  }
+}

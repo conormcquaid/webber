@@ -54,6 +54,7 @@ static void websocket_event_handler(void *handler_args, esp_event_base_t base, i
         }
         break;
     case WEBSOCKET_EVENT_DATA:
+    
         ESP_LOGI(TAG, "WEBSOCKET_EVENT_DATA");
         ESP_LOGI(TAG, "Received opcode=%d", data->op_code);
         if (data->op_code == 0x2) { // Opcode 0x2 indicates binary data

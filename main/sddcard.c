@@ -21,10 +21,16 @@
 #include "oled_i2c.h"
 #include "dirent.h"
 #include <errno.h>
+#include "sdcard.h"
 
 static const char* TAG = "sdcard";
 
 #define MOUNT_POINT "/sdcard"
+
+#define FRAME_SIZE_HIGH ()
+#define FRAME_SIZE_LOW ()
+
+int frame_size;
 
 DIR* dirp;
 FILE* f = NULL;
@@ -36,7 +42,7 @@ void enumerate_files(void){
     
     while((dint = readdir(dirp)) != NULL){
         if(dint->d_type == DT_REG){
-            snprintf(fname, sizeof(fname), "%s/%s", MOUNT_POINT, dint->d_name);
+            snprintf(fname, sizeof(fname) - 10, "%.10s/%.240s", MOUNT_POINT, dint->d_name);
             if(stat(fname, &st) == 0){
                 ESP_LOGI(TAG, "Found file: %s, size %ld", dint->d_name, st.st_size);
                 if(st.st_size % 54 == 0){
@@ -160,148 +166,6 @@ esp_err_t init_sd(void){
 }
 
 
-
-esp_err_t init_orig_sd(void){
-
-    ESP_LOGI(TAG, "Initializing SD card");
-
-    sdmmc_host_t host = SDMMC_HOST_DEFAULT();
-    host.max_freq_khz=10000;
-
-    // To use 1-line SD mode, uncomment the following line:
-    // host.flags = SDMMC_HOST_FLAG_1BIT;
-
-    // This initializes the slot without card detect (CD) and write protect (WP) signals.
-    // Modify slot_config.gpio_cd and slot_config.gpio_wp if your board has these signals.
-    sdmmc_slot_config_t slot_config = SDMMC_SLOT_CONFIG_DEFAULT();
-
-    slot_config.width = 1;
-    // slot_config.gpio_cd = SDMMC_SLOT_NO_CD; // no card detect
-    // slot_config.gpio_wp = SDMMC_SLOT_NO_WP; // no write protect 
-    // slot_config.flags |= SDMMC_SLOT_FLAG_INTERNAL_PULLUP; // enable internal pullups on the bus 
-    // slot_config.flags |= SDMMC_SLOT_FLAG_WP_ACTIVE_HIGH; // write protect active high
-    // slot_config.flags |= SDMMC_SLOT_FLAG_UHS1; // enable UHS-I mode
-    // Set the GPIOs used for the card.
-    slot_config.clk = GPIO_NUM_16;  // CLK
-    slot_config.cmd = GPIO_NUM_6;   // CMD
-    slot_config.d0  = GPIO_NUM_7;   // D0
-    slot_config.d1  = GPIO_NUM_35;  // D1
-    slot_config.d2  = GPIO_NUM_10;  // D2
-    slot_config.d3  = GPIO_NUM_9;   // D3
-
-    slot_config.cd  = GPIO_NUM_8;   // CD
-
-
-    slot_config.clk = GPIO_NUM_16;
-    slot_config.cmd = GPIO_NUM_6;
-    slot_config.d0  = GPIO_NUM_7; 
-    slot_config.d1  = GPIO_NUM_35;
-    slot_config.d2  = GPIO_NUM_10;
-    slot_config.d3  = GPIO_NUM_9;
-    // slot_config.d4  = GPIO_NUM_NC;
-    // slot_config.d5  = GPIO_NUM_NC;;
-    // slot_config.d6  = GPIO_NUM_NC;
-    // slot_config.d7  = GPIO_NUM_NC;
-    slot_config.cd  = GPIO_NUM_NC;   // CD
-
-    slot_config.width = 4;
-    slot_config.flags &= ~SDMMC_HOST_FLAG_8BIT;
-
-
-    // Options for mounting the filesystem.
-    // If format_if_mount_failed is set to true, SD card will be partitioned and formatted
-    // in case when mounting fails.
-    esp_vfs_fat_sdmmc_mount_config_t mount_config = {
-        .format_if_mount_failed = false,
-        .max_files = 5
-    };
-
-    // Use settings defined above to initialize SD card and mount FAT filesystem.
-    // Note: esp_vfs_fat_sdmmc_mount is an all-in-one convenience function.
-    // Please check its source code and implement error recovery when developing
-    // production applications.
-    sdmmc_card_t* card;
-    
-    //TOD retry card iniialization if we get a 0x107 or other recoverable error
-    // may need some manner of card reset between attempts
-    // for extra credit, retrigger iniaiization if card removed & reinserted
-
-    esp_err_t ret = esp_vfs_fat_sdmmc_mount("/sdcard", &host, &slot_config, &mount_config, &card);
-    if (ret != ESP_OK) {
-        if (ret == ESP_FAIL) {
-            ESP_LOGE(TAG, "Failed to mount filesystem. If you want the card to be formatted, set format_if_mount_failed = true.");
-        } else {
-            ESP_LOGE(TAG, "Failed to initialize the card (0x%04x).", ret);
-        }
-        return -1;
-    }
-    if ((ret  = esp_vfs_fat_sdmmc_mount("/sdcard", &host, &slot_config, &mount_config, &card)) != ESP_OK) {
-        
-        ESP_LOGE(TAG, "Failed to initialize the card AGAIN! (0x%04x).", ret);
-        return ESP_ERR_NOT_FOUND;
-        
-    }
-    ESP_LOGI(TAG, "SD Card initialized OK\n");
-
-    // Card has been initialized, print its properties
-    sdmmc_card_print_info(stdout, card);
-
-//    f = fopen("/sdcard/out.raw", "r");
-//
-//    if( f == NULL ){
-//
-//    	printf("Open out.raw failed\n");
-//
-//    }
-    const char root_dir[] = "/sdcard/";
-
-    dirp = opendir(root_dir);
-    if(dirp == NULL){
-        ESP_LOGE(TAG, "Failed to open directory /sdcard");
-        return -1;
-    }   
-
-    struct dirent* dint = readdir(dirp);
-
-    static int nFiles = 0;
-    struct stat st;
-    char fname[260];
-    
-    while(dint != NULL){
-        if(dint->d_type == DT_REG){
-
-            memcpy(fname, root_dir, 10);
-            memcpy(fname + strlen(root_dir), dint->d_name, strlen(dint->d_name));
-            fname[8+strlen(dint->d_name)] = '\0';
-
-            int i = stat(fname, &st);
-            if(i != 0){
-                ESP_LOGE(TAG, "Stat failed for %s with errno %d", fname, errno);
-                //return -1;
-            }   
-
-            ESP_LOGI(TAG, "Found file: %s, size %ld", dint->d_name, st.st_size);
-            nFiles++;
-
-            f = fopen(fname, "r");
-            if(f == NULL){
-                ESP_LOGE(TAG, "Failed to open file %s with errno %d", fname, errno);
-            } else {
-                ESP_LOGI(TAG, "Opened file %s successfully", fname);
-                fclose(f);
-            }
-
-        }else if(dint->d_type == DT_DIR){
-            ESP_LOGI(TAG, "Ignoring directory: %s", dint->d_name);
-        }else{
-            ESP_LOGI(TAG, "Found unknown item: %s", dint->d_name);
-            
-        }   
-        dint = readdir(dirp);  
-    } 
-    return ESP_OK;
-
-}
 
 uint8_t getFrame(uint8_t * pFrame){
 

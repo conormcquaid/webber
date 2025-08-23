@@ -109,8 +109,12 @@ led_strip_refresh(led_strip);
         
 
     // }
+    TaskHandle_t hSupervisor;
+    xTaskCreate(supervisor, "supervisor", 10*1024, NULL, tskIDLE_PRIORITY, &hSupervisor);
+    
+    OLED_init();
 
-
+    OLED_WriteBig( "poop", 0, 0);
     
     // write_leds();
 
@@ -119,9 +123,10 @@ led_strip_refresh(led_strip);
     wifi_init_apsta();
 
     init_rotary_encoder(NULL);
+
+
     
-    TaskHandle_t hSupervisor;
-    xTaskCreate(supervisor, "supervisor", 10*1024, NULL, tskIDLE_PRIORITY, &hSupervisor);
+
 
     // TaskHandle_t hTV;
     // xTaskCreate(tv_task, "tv_task", 10*1024, NULL, tskIDLE_PRIORITY, &hTV);

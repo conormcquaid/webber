@@ -8,6 +8,7 @@
 #include "led_strip_encoder.h"
 #include "cJSON.h"
 #include "server.h"
+#include "ui/ui_state.h"
 
 static char* TAG = "super";
 int hue = 0;
@@ -62,6 +63,7 @@ void update_page_hue(void) {
     ws_notify(hue_msg);
 }
 
+#define SUPER_SLEEP 100
 
 void supervisor(void* params){
 
@@ -84,6 +86,8 @@ void supervisor(void* params){
 
     // static int wait = 1000;
     // static int en = 0;
+
+//    current_ui_state->init();  
 
     // go
     while(1){
@@ -147,6 +151,8 @@ void supervisor(void* params){
         //     wait = 100;
         // }
 
-        vTaskDelay(100 / portTICK_PERIOD_MS);
+   //     current_ui_state->tick(SUPER_SLEEP);         
+
+        vTaskDelay( SUPER_SLEEP / portTICK_PERIOD_MS);
     }    
 }

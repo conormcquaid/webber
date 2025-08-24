@@ -4,7 +4,7 @@
 # factory,  app,  factory, 0x10000,  2M,
 # spart,    data, spiffs,         ,  0x90000
 
-nvs,      data, nvs,     0xa000,   0x6000,
-phy_init, data, phy,            ,   0x1000,
-factory,  app,  factory,        ,  2M,
-spart,    data, spiffs,         ,  0x90000
+nvs,      data, nvs,     0xa000,     0x6000,
+phy_init, data, phy,            ,    0x1000,
+factory,  app,  factory,        ,  0x100000,
+spart,    data, spiffs,         ,   0xa0000

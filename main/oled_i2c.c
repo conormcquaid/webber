@@ -177,7 +177,7 @@ void data(uint8_t c){
 	i2c_master_write_slave( I2C_MASTER_NUM, buf, 2);
 }
 
-void OLED_fill(void){
+void OLED_fill(uint8_t* source){
 
 	uint8_t address = 0;
 
@@ -188,11 +188,20 @@ void OLED_fill(void){
 	command(address, 0);    // page start
 	command(address, 7);    // page end (8 pages for 64 rows OLED)
 	
-	for(int y=0; y < 128; y++){
-		for(int x = 0; x < 8; x++){
-			data(0xAA);
-		}
-	}
+    if(!source){
+        for(int y=0; y < 128; y++){
+            for(int x = 0; x < 8; x++){
+                data(0xAA);
+            }
+        }
+    }else{
+
+        for(int y=0; y < 128; y++){
+            for(int x = 0; x < 8; x++){
+                data(*source++);
+            }
+        }
+    }
 
 }
 
@@ -269,7 +278,7 @@ void OLED_init()
 	
 	vTaskDelay((200) / portTICK_PERIOD_MS);
 	
-	OLED_fill();
+	OLED_fill(NULL);
 }
 void OLED_WriteBig( char* s, uint8_t line, uint8_t charpos){
 	

@@ -9,6 +9,9 @@
 #include "cJSON.h"
 #include "server.h"
 #include "ui/ui_state.h"
+#include "sdcard.h"
+#include "led_strip.h"
+#include "oled_i2c.h"
 
 static char* TAG = "super";
 int hue = 0;
@@ -63,7 +66,7 @@ void update_page_hue(void) {
     ws_notify(hue_msg);
 }
 
-#define SUPER_SLEEP 100
+#define SUPER_SLEEP 25
 
 void supervisor(void* params){
 
@@ -73,6 +76,11 @@ void supervisor(void* params){
     const int hue_increment = 45;
     qSuperMessage = xQueueCreate(10, sizeof(void*));
     char* msg;
+
+    OLED_init();
+    ESP_LOGI(TAG, "oled");
+
+    OLED_WriteBig( "poop", 0, 0);
 
     // for(int q = 0; q < 54; q++){
     //     led_strip_pixels[q] = 0; // clear the led strip pixels
@@ -87,7 +95,7 @@ void supervisor(void* params){
     // static int wait = 1000;
     // static int en = 0;
 
-//    current_ui_state->init();  
+    current_ui_state->init();  
 
     // go
     while(1){
@@ -151,7 +159,9 @@ void supervisor(void* params){
         //     wait = 100;
         // }
 
-   //     current_ui_state->tick(SUPER_SLEEP);         
+        current_ui_state->tick(SUPER_SLEEP);   
+        
+        //ESP_LOGI(TAG, "SuperSleep");
 
         vTaskDelay( SUPER_SLEEP / portTICK_PERIOD_MS);
     }    

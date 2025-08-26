@@ -55,33 +55,34 @@ led_strip_handle_t configure_led(void)
 void app_main(void)
 {
 
+ESP_LOGI(TAG, "__app main");
 
 /// Create the LED strip object
-led_strip_handle_t led_strip = configure_led();
+// led_strip_handle_t led_strip = configure_led();
 
-led_strip_set_pixel(led_strip, 0, 50, 0, 0);
-led_strip_set_pixel(led_strip, 1, 0, 50, 0);
-led_strip_set_pixel(led_strip, 2, 0, 0, 50);
-led_strip_set_pixel(led_strip, 3, 0, 0, 0);
-led_strip_set_pixel(led_strip, 4, 50, 0, 0);
-led_strip_set_pixel(led_strip, 5, 0, 50, 0);
-led_strip_set_pixel(led_strip, 6, 0, 0, 50);
-led_strip_set_pixel(led_strip, 7, 0, 0, 0);
-led_strip_set_pixel(led_strip, 8, 50, 0, 0);
-led_strip_set_pixel(led_strip, 9, 0, 50, 0);
+// led_strip_set_pixel(led_strip, 0, 50, 0, 0);
+// led_strip_set_pixel(led_strip, 1, 0, 50, 0);
+// led_strip_set_pixel(led_strip, 2, 0, 0, 50);
+// led_strip_set_pixel(led_strip, 3, 0, 0, 0);
+// led_strip_set_pixel(led_strip, 4, 50, 0, 0);
+// led_strip_set_pixel(led_strip, 5, 0, 50, 0);
+// led_strip_set_pixel(led_strip, 6, 0, 0, 50);
+// led_strip_set_pixel(led_strip, 7, 0, 0, 0);
+// led_strip_set_pixel(led_strip, 8, 50, 0, 0);
+// led_strip_set_pixel(led_strip, 9, 0, 50, 0);
 
-    int nLeds = 54;
-    for(int q = 0; q < nLeds; q++){
+//     int nLeds = 54;
+//     for(int q = 0; q < nLeds; q++){
         
-        RGBColor c = hslToRgb(360.0 * q / nLeds, 90, 10);
+//         RGBColor c = hslToRgb(360.0 * q / nLeds, 90, 10);
 
-       // RGBColor c = hslToRgb(36, 90, 10);
+//        // RGBColor c = hslToRgb(36, 90, 10);
 
-        led_strip_set_pixel(led_strip, q, c.r, c.g, c.b);
+//         led_strip_set_pixel(led_strip, q, c.r, c.g, c.b);
 
-    }
+//     }
 
-led_strip_refresh(led_strip);
+// led_strip_refresh(led_strip);
 
 
   //  OLED_init();
@@ -111,23 +112,25 @@ led_strip_refresh(led_strip);
     // }
 
     
-    OLED_init();
+    // OLED_init();
+    // ESP_LOGI(TAG, "oled");
 
-    OLED_WriteBig( "poop", 0, 0);
+    // OLED_WriteBig( "poop", 0, 0);
     
     // write_leds();
 
-    init_sd();
+//    init_sd();
+    ESP_LOGI(TAG, "sd");
 
 //    wifi_init_apsta();
 
     init_rotary_encoder(NULL);
-
+ESP_LOGI(TAG, "rotor");
 
     ESP_LOGI(TAG, "ESPLOGI");
 
     TaskHandle_t hSupervisor;
-    xTaskCreate(supervisor, "supervisor", 10*1024, NULL, tskIDLE_PRIORITY, &hSupervisor);
+    xTaskCreatePinnedToCore(supervisor, "supervisor", 10*1024, NULL, tskIDLE_PRIORITY, &hSupervisor, tskNO_AFFINITY);
     // TaskHandle_t hTV;
     // xTaskCreate(tv_task, "tv_task", 10*1024, NULL, tskIDLE_PRIORITY, &hTV);
 

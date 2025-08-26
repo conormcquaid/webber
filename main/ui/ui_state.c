@@ -3,6 +3,9 @@
 #include "stdbool.h"
 #include "cog2.h"
 #include "cog3.h"
+#include "esp_log.h"
+
+static const char* TAG = "ui_";
 
 PROTOYPE_STATE(idle);
 PROTOYPE_STATE(system);
@@ -55,12 +58,27 @@ void splash_tick(int milliseconds){
  }
 
 /////////////////////////////////////////////////////////////////////////////
-void idle_init(void){};
+static int idle_idx = 0;
+static int idle_ms = 0;
+#define IDLE_FRAME_DURATION (40)
+#define IDLE_NUM_FRAMES (10)
+void idle_init(void){
+    idle_render();
+
+};
 void idle_event_handler(ui_event_type_t event, void* param){};
-void idle_tick(int milliseconds){};
+void idle_tick(int milliseconds){
+    idle_ms += milliseconds;
+    if(idle_ms >= IDLE_FRAME_DURATION){
+        idle_ms = 0;
+        idle_idx = (idle_idx + 1) % IDLE_NUM_FRAMES;
+        idle_render();
+    }       
+};
 void idle_render(void){ 
-    OLED_Clear(0,7);
-    OLED_fill((uint8_t*)cog3);
+    //ESP_LOGI(TAG, "IN");
+    OLED_fill(0, 7, (uint8_t*)cog3[idle_idx]);
+    //ESP_LOGI(TAG, "OUT");
 }
 
 void system_init(void){};

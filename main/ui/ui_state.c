@@ -4,6 +4,7 @@
 #include "cog2.h"
 #include "cog3.h"
 #include "esp_log.h"
+#include "cog3_hi_res.h"
 
 static const char* TAG = "ui_";
 
@@ -30,7 +31,7 @@ void set_next_state(ui_state_t* next_state){
 
 /////////////////////////////////////////////////////////////////////////////
 
-#define SPLASH_TIMEOUT_MS (1000 * 30) //30 seconds
+#define SPLASH_TIMEOUT_MS (1000 * 3) //30 seconds
 static bool shown = false;
 void splash_init(void){ 
     shown = false;
@@ -61,7 +62,7 @@ void splash_tick(int milliseconds){
 static int idle_idx = 0;
 static int idle_ms = 0;
 #define IDLE_FRAME_DURATION (40)
-#define IDLE_NUM_FRAMES (10)
+#define IDLE_NUM_FRAMES (25)
 void idle_init(void){
     idle_render();
 
@@ -76,9 +77,8 @@ void idle_tick(int milliseconds){
     }       
 };
 void idle_render(void){ 
-    //ESP_LOGI(TAG, "IN");
     OLED_fill(0, 7, (uint8_t*)cog3[idle_idx]);
-    //ESP_LOGI(TAG, "OUT");
+    OLED_fill(0, 7, (uint8_t*)hi_rez_3cog[idle_idx]);
 }
 
 void system_init(void){};

@@ -58,31 +58,31 @@ void app_main(void)
 ESP_LOGI(TAG, "__app main");
 
 /// Create the LED strip object
-// led_strip_handle_t led_strip = configure_led();
+ led_strip_handle_t led_strip = configure_led();
 
-// led_strip_set_pixel(led_strip, 0, 50, 0, 0);
-// led_strip_set_pixel(led_strip, 1, 0, 50, 0);
-// led_strip_set_pixel(led_strip, 2, 0, 0, 50);
-// led_strip_set_pixel(led_strip, 3, 0, 0, 0);
-// led_strip_set_pixel(led_strip, 4, 50, 0, 0);
-// led_strip_set_pixel(led_strip, 5, 0, 50, 0);
-// led_strip_set_pixel(led_strip, 6, 0, 0, 50);
-// led_strip_set_pixel(led_strip, 7, 0, 0, 0);
-// led_strip_set_pixel(led_strip, 8, 50, 0, 0);
-// led_strip_set_pixel(led_strip, 9, 0, 50, 0);
+led_strip_set_pixel(led_strip, 0, 50, 0, 0);
+led_strip_set_pixel(led_strip, 1, 0, 50, 0);
+led_strip_set_pixel(led_strip, 2, 0, 0, 50);
+led_strip_set_pixel(led_strip, 3, 0, 0, 0);
+led_strip_set_pixel(led_strip, 4, 50, 0, 0);
+led_strip_set_pixel(led_strip, 5, 0, 50, 0);
+led_strip_set_pixel(led_strip, 6, 0, 0, 50);
+led_strip_set_pixel(led_strip, 7, 0, 0, 0);
+led_strip_set_pixel(led_strip, 8, 50, 0, 0);
+led_strip_set_pixel(led_strip, 9, 0, 50, 0);
 
-//     int nLeds = 54;
-//     for(int q = 0; q < nLeds; q++){
+    int nLeds = 54;
+    for(int q = 0; q < nLeds; q++){
         
-//         RGBColor c = hslToRgb(360.0 * q / nLeds, 90, 10);
+        RGBColor c = hslToRgb(360.0 * q / nLeds, 90, 10);
 
-//        // RGBColor c = hslToRgb(36, 90, 10);
+       // RGBColor c = hslToRgb(36, 90, 10);
 
-//         led_strip_set_pixel(led_strip, q, c.r, c.g, c.b);
+        led_strip_set_pixel(led_strip, q, c.r, c.g, c.b);
 
-//     }
+    }
 
-// led_strip_refresh(led_strip);
+led_strip_refresh(led_strip);
 
 
   //  OLED_init();
@@ -119,10 +119,10 @@ ESP_LOGI(TAG, "__app main");
     
     // write_leds();
 
-//    init_sd();
+    init_sd();
     ESP_LOGI(TAG, "sd");
 
-//    wifi_init_apsta();
+    wifi_init_apsta();
 
     init_rotary_encoder(NULL);
 ESP_LOGI(TAG, "rotor");

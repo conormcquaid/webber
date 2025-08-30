@@ -25,31 +25,31 @@ PROTOYPE_STATE(file_browser);
 ui_state_t* current_ui_state;
 void ui_task(void* params);
 
-static ui_event_t button_event;
+//static ui_event_t button_event;
 
-void  button_handler_isr(void* aaargh){
+// void  button_handler_isr(void* aaargh){
 
-    if((uint32_t)aaargh != ROTOR_PUSH_BUTTON){
-        return;
-    }   
-    int level = gpio_get_level(ROTOR_PUSH_BUTTON);
+//     if((uint32_t)aaargh != ROTOR_PUSH_BUTTON){
+//         return;
+//     }   
+//     int level = gpio_get_level(ROTOR_PUSH_BUTTON);
 
-    if(level == 0){
-        // button pressed
-        button_event.type = UI_KEYDOWN;
+//     if(level == 0){
+//         // button pressed
+//         button_event.type = UI_KEYDOWN;
 
-    } else {
-        // button released
-        button_event.type = UI_KEYUP;
-    }
-    xQueueSendFromISR(qRotor, &button_event, NULL);
-} 
+//     } else {
+//         // button released
+//         button_event.type = UI_KEYUP;
+//     }
+//     xQueueSendFromISR(qRotor, &button_event, NULL);
+// } 
 
 void button_install(void){
         // set up IO36 as the switch input
     
     gpio_config_t io_conf;
-    io_conf.intr_type = GPIO_INTR_LOW_LEVEL;//GPIO_INTR_ANYEDGE;
+    io_conf.intr_type = GPIO_INTR_DISABLE;//GPIO_INTR_ANYEDGE;
     io_conf.mode = GPIO_MODE_INPUT;
     io_conf.pin_bit_mask = (1ULL << ROTOR_PUSH_BUTTON);
     io_conf.pull_down_en = GPIO_PULLDOWN_DISABLE;
@@ -57,23 +57,17 @@ void button_install(void){
 
     ESP_ERROR_CHECK(gpio_config(&io_conf));
 
-    gpio_install_isr_service(0);
-    gpio_isr_handler_add(ROTOR_PUSH_BUTTON, button_handler_isr, (void*)ROTOR_PUSH_BUTTON);
+    // gpio_install_isr_service(0);
+    // gpio_isr_handler_add(ROTOR_PUSH_BUTTON, button_handler_isr, (void*)ROTOR_PUSH_BUTTON);
 }
 
 #define UI_DELAY 100
 
 void ui_init(void){
-    
-
 
     //spawn ui task
     TaskHandle_t hUI_task;
     xTaskCreatePinnedToCore(ui_task, "ui_task", 20*1024, NULL, configMAX_PRIORITIES-2, &hUI_task, 1);
-
-    // set up interrupt on switch
-
- 
 
 }
 
@@ -97,27 +91,53 @@ void ui_task(void* params){
     
     init_rotary_encoder(NULL);
 
-    //button_install();
-
-    //int event_count; // event count from the rotary encoder
-    
+    button_install();
+   
     ui_event_t evt;
+    int held_ms = 0;
 
     while(1){
 
-        while (xQueueReceive(qRotor, &evt, 0)){
-
-            ESP_LOGI(TAG, "Rotor event type: %d", evt.type);
-            if(current_ui_state->event_handler){
-                current_ui_state->event_handler( evt);
-            }   
-
-           // update_page_hue();
-
-        }
+        // process tick
         if(current_ui_state && current_ui_state->tick){
             current_ui_state->tick(UI_DELAY);
         }
+
+        // chechk for ui inputs
+        evt.type = UI_NONE;
+        while (xQueueReceive(qRotor, &evt, 0)){
+
+            ESP_LOGI(TAG, "Rotor event type: %d", evt.type);
+        }
+
+        if(gpio_get_level(ROTOR_PUSH_BUTTON) == 0){
+            // button is held down
+            held_ms += UI_DELAY;
+            if(held_ms > LONG_PRESS_DURATION){
+                // long press, go to system menu
+                held_ms = 0;
+                set_next_state(&system_state);
+            }
+        } else {
+            // button released
+            if(held_ms >= MEDIUM_PRESS_DURATION){
+                evt.type = UI_MEDIUM_PRESS;
+                ESP_LOGI(TAG, "Medium");
+            } else if(held_ms >= SHORT_PRESS_DURATION){
+                evt.type = UI_SHORT_PRESS;
+            }
+   
+            // reset held time counter
+            evt.type = UI_NONE;
+            held_ms = 0;
+        }
+        // process event
+        if(evt.type != UI_NONE && current_ui_state->event_handler){
+            current_ui_state->event_handler( evt);
+            ESP_LOGI(TAG, "event handled. type: %d", evt.type);
+
+        }
+        
         vTaskDelay(UI_DELAY / portTICK_PERIOD_MS);
     }
 }

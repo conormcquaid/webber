@@ -1,9 +1,15 @@
 #ifndef __UI_STATE_H__
 #define __UI_STATE_H__
 
+#define SHORT_PRESS_DURATION 200
+#define MEDIUM_PRESS_DURATION 600
+#define LONG_PRESS_DURATION 3000
+
 typedef enum {
-    UI_KEYDOWN,
-    UI_KEYUP,
+    UI_NONE,
+    UI_SHORT_PRESS,
+    UI_MEDIUM_PRESS,
+    UI_LONG_PRESS,
     UI_ROTOR_INC,
     UI_ROTOR_DEC
 }ui_event_type_t;

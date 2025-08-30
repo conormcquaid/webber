@@ -69,7 +69,7 @@ void ui_init(void){
 
     //spawn ui task
     TaskHandle_t hUI_task;
-    xTaskCreatePinnedToCore(ui_task, "ui_task", 20*1024, NULL, configMAX_PRIORITIES-2, &hUI_task, CORE_ID_APP);
+    xTaskCreatePinnedToCore(ui_task, "ui_task", 20*1024, NULL, configMAX_PRIORITIES-2, &hUI_task, 1);
 
     // set up interrupt on switch
 

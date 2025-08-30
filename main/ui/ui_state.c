@@ -14,7 +14,7 @@
 static const char* TAG = "ui_";
 
 PROTOYPE_STATE(idle);
-PROTOYPE_STATE(system);
+PROTOYPE_STATE(internals);
 PROTOYPE_STATE(splash);
 PROTOYPE_STATE(menu);
 PROTOYPE_STATE(about);
@@ -25,25 +25,7 @@ PROTOYPE_STATE(file_browser);
 ui_state_t* current_ui_state;
 void ui_task(void* params);
 
-//static ui_event_t button_event;
 
-// void  button_handler_isr(void* aaargh){
-
-//     if((uint32_t)aaargh != ROTOR_PUSH_BUTTON){
-//         return;
-//     }   
-//     int level = gpio_get_level(ROTOR_PUSH_BUTTON);
-
-//     if(level == 0){
-//         // button pressed
-//         button_event.type = UI_KEYDOWN;
-
-//     } else {
-//         // button released
-//         button_event.type = UI_KEYUP;
-//     }
-//     xQueueSendFromISR(qRotor, &button_event, NULL);
-// } 
 
 void button_install(void){
         // set up IO36 as the switch input
@@ -57,8 +39,6 @@ void button_install(void){
 
     ESP_ERROR_CHECK(gpio_config(&io_conf));
 
-    // gpio_install_isr_service(0);
-    // gpio_isr_handler_add(ROTOR_PUSH_BUTTON, button_handler_isr, (void*)ROTOR_PUSH_BUTTON);
 }
 
 #define UI_DELAY 100
@@ -116,7 +96,7 @@ void ui_task(void* params){
             if(held_ms > LONG_PRESS_DURATION){
                 // long press, go to system menu
                 held_ms = 0;
-                set_next_state(&system_state);
+                set_next_state(&internals_state);
             }
         } else {
             // button released
@@ -210,10 +190,10 @@ void idle_event_handler(ui_event_t evt){
     idle_render();
 }
 
-void system_init(void){};
-void system_handler(ui_event_t event){};
-void system_tick(int milliseconds){};
-void system_render(void){};
+void internals_init(void){};
+void internals_handler(ui_event_t event){};
+void internals_tick(int milliseconds){};
+void internals_render(void){};
 
 void menu_init(void){};
 void menu_event_handler(ui_event_t event){};

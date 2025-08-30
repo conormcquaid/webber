@@ -17,7 +17,7 @@
 extern "C" {
 #endif
 
-#include "esp_err.h"
+//#include "esp_err.h"
 
 extern QueueHandle_t qRotor;
 void init_rotary_encoder(void* p);

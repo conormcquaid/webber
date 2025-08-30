@@ -19,6 +19,9 @@ extern "C" {
 
 #include "esp_err.h"
 
+extern QueueHandle_t qRotor;
+void init_rotary_encoder(void* p);
+
 /**
  * @brief Type of Rotary underlying device handle
  *

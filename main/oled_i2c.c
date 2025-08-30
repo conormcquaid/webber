@@ -5,8 +5,14 @@
 #include "driver/i2c_master.h"
 #include "logo.h"
 #include "esp_log.h"
+#include "stdbool.h"
 
+#define CMD_CONTINUOUS_SCROLL_H_RIGHT       0x26
+#define CMD_CONTINUOUS_SCROLL_H_LEFT        0x27
+#define CMD_ONE_COLUMN_SCROLL_H_RIGHT       0x2C
+#define CMD_ONE_COLUMN_SCROLL_H_LEFT        0x2D
 
+//10.3.1 Set Fade Out and Blinking (23h) and 10.3.2 Set Zoom In (D6h) 
 
 #define I2C_MASTER_SCL_IO    18    /*!< gpio number for I2C master clock */  /* 17 & 18 for esp32-s3 renata-tv */
 #define I2C_MASTER_SDA_IO    17    /*!< gpio number for I2C master data  */
@@ -30,6 +36,7 @@ i2c_master_dev_handle_t dev_handle;
 
 uint8_t* i2c_oled_buffer;
 uint8_t  oled_cmd_buffer[6];
+bool inverse_mode;
 
 void i2c_master_init()
 {
@@ -59,6 +66,8 @@ void i2c_master_init()
     ESP_ERROR_CHECK(i2c_master_bus_add_device(bus_handle, &dev_config, &dev_handle));
 
     i2c_oled_buffer = malloc(1 + 128 * 8); // 128 columns * 8 pages (64 rows / 8 bits per byte)
+
+	inverse_mode = false;
   
     printf("i2c_master_bus_add_device success\n");
 }
@@ -72,8 +81,46 @@ void command(uint8_t c){
 	//ESP_LOGI(TAG, "Cmd: %02x", c);
 }
 
+// void OLED_fill(uint8_t start_line, uint8_t end_line, uint8_t* source){
 
-void OLED_fill(uint8_t start_line, uint8_t end_line, uint8_t* source){
+// 	uint8_t cmds[] = {0x00, 0x21, 0x00, 0x00, 0x00, 0x7F, 0x00, 0x22, 0x00, start_line, 0x00, end_line};
+//     //ESP_ERROR_CHECK(i2c_master_transmit( dev_handle, cmds, sizeof(cmds), 666));
+
+// 	// command( 0x21); // SSD1306_COLUMNADDR
+// 	// command( 0);    // column start
+// 	// command( 127);  // column end
+// 	// command( 0x22); // SSD1306_PAGEADDR
+// 	// command( start_line);    // page start
+// 	// command( end_line);      // page end (8 pages for 64 rows OLED)
+    
+//     // henceforth comes the data...
+//     uint8_t* buf = i2c_oled_buffer;
+// 	*buf++ = 0x40; // data mode
+    
+	
+//     if(!source){
+// 		// make our own data buffer
+
+//         for(int y=0; y < 128 * 8; y++){
+//             *buf++ = 0x01;
+//         }
+//     }else{
+// 		// use supplied data buffer
+// 		for(int y = 0; y < 128 * 8; y++){
+//             *buf++ = *source++;
+// 		}
+
+//     }
+// //    ESP_ERROR_CHECK(i2c_master_transmit(dev_handle,i2c_oled_buffer, (1 + 128 * 8), 666));
+//     i2c_master_transmit_multi_buffer_info_t biff[2] = {
+//         { .write_buffer = cmds,             .buffer_size = sizeof(cmds) },
+//         { .write_buffer = i2c_oled_buffer,  .buffer_size = 1 + 128 * 8}
+//     };
+//     ESP_ERROR_CHECK(i2c_master_multi_buffer_transmit(dev_handle, biff, 2, 666));
+// }
+
+
+void OLED_fill(uint8_t start_line, uint8_t end_line, uint8_t* source, bool inverse){
 
     //uint8_t cmds[] = {0x00, 0x21, 0x00, 0x00, 0x00, 0x7F, 0x00, 0x22, start_line, end_line};
     //ESP_ERROR_CHECK(i2c_master_transmit( dev_handle, cmds, sizeof(cmds), 666));
@@ -98,8 +145,15 @@ void OLED_fill(uint8_t start_line, uint8_t end_line, uint8_t* source){
         }
     }else{
 		// use supplied data buffer
-		for(int y = 0; y < 128 * 8; y++){
-            *buf++ = *source++;
+		if(inverse){
+			for(int y = 0; y < 128 * 8; y++){
+				*buf++ = ~(*source++);
+			}
+			
+		}else{
+			for(int y = 0; y < 128 * 8; y++){
+				*buf++ = *source++;
+			}
 		}
 
     }
@@ -113,7 +167,7 @@ void OLED_fill(uint8_t start_line, uint8_t end_line, uint8_t* source){
 
 void OLED_Clear(int start_line, int end_line){
 
-    OLED_fill(start_line, end_line, NULL);
+    OLED_fill(start_line, end_line, NULL, false);
 }
 
 void OLED_init()
@@ -173,7 +227,7 @@ void OLED_init()
 	// OLED_WriteBig( "X", 127 - 9, 6);
 }
 
-void OLED_WriteBig( char* s, uint8_t line, uint8_t charpos){
+void OLED_WriteBig( char* s, uint8_t line, uint8_t charpos, bool invert){
 	
 	uint8_t xpos = charpos * 10;
 	uint8_t c;
@@ -211,7 +265,9 @@ void OLED_WriteBig( char* s, uint8_t line, uint8_t charpos){
         //ESP_ERROR_CHECK(i2c_master_transmit( dev_handle, commands, sizeof(commands), 666));
         
 		for(int i = 0; i < 20; i++){
-			buffer[i+1] =  font10x16[ (c*20) + i] ;
+			uint8_t tmp = font10x16[ (c*20) + i] ;
+			if(invert){ tmp = ~tmp; }
+			buffer[i+1] =  tmp;
 		}	
 		ESP_ERROR_CHECK(i2c_master_transmit( dev_handle, buffer, sizeof(buffer), 666));
         //i2c_master_transmit_multi_buffer_info_t biff[2] = {

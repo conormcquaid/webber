@@ -170,8 +170,8 @@ esp_err_t post_process(char* post){
 
     memcpy(cred.ssid, ssid, strlen(ssid)+1);
     memcpy(cred.pwd,  pwd,  strlen(pwd) +1);
-    memcpy(cred.host, host, strlen(host)+1);
-    cred.port = port;
+    // memcpy(cred.host, host, strlen(host)+1);
+    // cred.port = port;
     // WifiCred cred={
     //     .ssid = ssid,
     //     .pwd = pwd,
@@ -382,6 +382,7 @@ httpd_handle_t start_webserver( void )
     httpd_config_t config = HTTPD_DEFAULT_CONFIG();
 
     config.uri_match_fn = httpd_uri_match_wildcard;
+    config.stack_size = 8192;
 
     init_spiff();
 

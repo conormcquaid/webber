@@ -42,16 +42,22 @@ static char* TAG = "Wifi_Man";
 
 esp_err_t init_wifi_creds_nvs(void);
 esp_err_t deinit_wifi_creds(void);
-esp_err_t load_wifi_creds(WiFiCredBlob** pCreds);
+esp_err_t load_wifi_creds(void);
 
-WiFiCredBlob* pCredentials;
+WifiCred* pCredentials;
 
 extern void websocket_task(void* nada);
 
-
+#define COTTAGE 99
 /* STA Configuration */
+#ifdef COTTAGE
+#define EXAMPLE_ESP_WIFI_STA_SSID           "NETGEAR06"
+#define EXAMPLE_ESP_WIFI_STA_PASSWD         "vastflower863"
+#else
 #define EXAMPLE_ESP_WIFI_STA_SSID           "elephant"
 #define EXAMPLE_ESP_WIFI_STA_PASSWD         "20217th&ve"
+#endif
+
 #define EXAMPLE_ESP_MAXIMUM_RETRY           10
 
 #if CONFIG_ESP_WIFI_AUTH_OPEN
@@ -127,7 +133,7 @@ static void wifi_event_handler(void *arg, esp_event_base_t event_base,
         ESP_LOGI(TAG_STA, "Station started");
     } else if (event_base == IP_EVENT && event_id == IP_EVENT_STA_GOT_IP) {
         ip_event_got_ip_t *event = (ip_event_got_ip_t *) event_data;
-        ESP_LOGI(TAG_STA, "Got IP:" IPSTR, IP2STR(&event->ip_info.ip));
+        ESP_LOGI(TAG_STA, "===================Got IP:" IPSTR, IP2STR(&event->ip_info.ip));
         s_retry_num = 0;
         xEventGroupSetBits(s_wifi_event_group, WIFI_CONNECTED_BIT);
     }
@@ -206,7 +212,7 @@ void softap_set_dns_addr(esp_netif_t *esp_netif_ap,esp_netif_t *esp_netif_sta)
 
 void wifi_init_apsta(void){
 
-   ESP_ERROR_CHECK(esp_netif_init());
+    ESP_ERROR_CHECK(esp_netif_init());
     ESP_ERROR_CHECK(esp_event_loop_create_default());
 
     //Initialize NVS

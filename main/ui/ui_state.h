@@ -2,7 +2,8 @@
 #define __UI_STATE_H__
 
 typedef enum {
-    UI_KEYPRESS,
+    UI_KEYDOWN,
+    UI_KEYUP,
     UI_ROTOR_INC,
     UI_ROTOR_DEC
 }ui_event_type_t;
@@ -14,17 +15,19 @@ typedef struct {
 
 typedef struct{
     void (*init)(void);
-    void (*event_handler)(ui_event_type_t event, void* param);
+    void (*event_handler)(ui_event_t event);
     void (*tick)(int millis);
     void (*render)(void);
 } ui_state_t;
+
+#define ROTOR_PUSH_BUTTON   GPIO_NUM_36
 
 //extern ui_state_t idle_state, system_state, splash_state, menu_state, about_state, settings_state, update_state, file_browser_state;
 extern ui_state_t* current_ui_state;
 
 #define PROTOYPE_STATE(STATE_NAME) \
 void STATE_NAME ## _init(void); \
-void STATE_NAME ## _event_handler(ui_event_type_t event, void* param); \
+void STATE_NAME ## _event_handler(ui_event_t event); \
 void STATE_NAME ## _tick(int milliseconds); \
 void STATE_NAME ## _render(void); \
 \
@@ -47,5 +50,8 @@ void STATE_NAME ## _render(void); \
 
 
 //TODO: including a render fumction may be unnecessary
+
+//TODO: initilizes oled. owns all OLED txns
+void ui_init(void);
 
 #endif /* __UI_STATE_H__ */

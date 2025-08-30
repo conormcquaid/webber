@@ -1,133 +1,119 @@
 #include <stdio.h>
 
 #include "main.h"
-#include "rotary_encoder.h"
-#include "led_strip.h"
 
-
-// temporary
-#include "sdcard.h"
-#include "led_strip.h"
-#include "oled_i2c.h"
+#include "ui/ui_state.h"
+#include "tv.h"
 
 
 const char* TAG = "main";
 
-extern void wifi_init_apsta(void);
-extern void init_rotary_encoder(void* p);
 
-// I belong elsewhere
-QueueHandle_t qHue;
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+#include "freertos/task.h"
+#include "freertos/semphr.h"
+#define ARRAY_SIZE_OFFSET   5   //Increase this if print_real_time_stats returns ESP_ERR_INVALID_SIZE
 
-#define BLINK_GPIO 21
 
-led_strip_handle_t configure_led(void)
+static esp_err_t print_real_time_stats(TickType_t xTicksToWait)
 {
-    // LED strip general initialization, according to your led board design
-    led_strip_config_t strip_config = {
-        .strip_gpio_num = BLINK_GPIO, // The GPIO that connected to the LED strip's data line
-        .max_leds = 64,      // The number of LEDs in the strip,
-        .led_model = LED_MODEL_WS2812,        // LED strip model
-        .color_component_format = LED_STRIP_COLOR_COMPONENT_FMT_GRB, // The color order of the strip: GRB
-        .flags = {
-            .invert_out = false, // don't invert the output signal
+    TaskStatus_t *start_array = NULL, *end_array = NULL;
+    UBaseType_t start_array_size, end_array_size;
+    configRUN_TIME_COUNTER_TYPE start_run_time, end_run_time;
+    esp_err_t ret;
+
+    //Allocate array to store current task states
+    start_array_size = uxTaskGetNumberOfTasks() + ARRAY_SIZE_OFFSET;
+    start_array = malloc(sizeof(TaskStatus_t) * start_array_size);
+    if (start_array == NULL) {
+        ret = ESP_ERR_NO_MEM;
+        goto exit;
+    }
+    //Get current task states
+    start_array_size = uxTaskGetSystemState(start_array, start_array_size, &start_run_time);
+    if (start_array_size == 0) {
+        ret = ESP_ERR_INVALID_SIZE;
+        goto exit;
+    }
+
+    vTaskDelay(xTicksToWait);
+
+    //Allocate array to store tasks states post delay
+    end_array_size = uxTaskGetNumberOfTasks() + ARRAY_SIZE_OFFSET;
+    end_array = malloc(sizeof(TaskStatus_t) * end_array_size);
+    if (end_array == NULL) {
+        ret = ESP_ERR_NO_MEM;
+        goto exit;
+    }
+    //Get post delay task states
+    end_array_size = uxTaskGetSystemState(end_array, end_array_size, &end_run_time);
+    if (end_array_size == 0) {
+        ret = ESP_ERR_INVALID_SIZE;
+        goto exit;
+    }
+
+    //Calculate total_elapsed_time in units of run time stats clock period.
+    uint32_t total_elapsed_time = (end_run_time - start_run_time);
+    if (total_elapsed_time == 0) {
+        ret = ESP_ERR_INVALID_STATE;
+        goto exit;
+    }
+
+    printf("| Task | Run Time | Percentage\n");
+    //Match each task in start_array to those in the end_array
+    for (int i = 0; i < start_array_size; i++) {
+        int k = -1;
+        for (int j = 0; j < end_array_size; j++) {
+            if (start_array[i].xHandle == end_array[j].xHandle) {
+                k = j;
+                //Mark that task have been matched by overwriting their handles
+                start_array[i].xHandle = NULL;
+                end_array[j].xHandle = NULL;
+                break;
+            }
         }
-    };
-
-    // LED strip backend configuration: RMT
-    led_strip_rmt_config_t rmt_config = {
-        .clk_src = RMT_CLK_SRC_DEFAULT,        // different clock source can lead to different power consumption
-        .resolution_hz = (10 * 1000 * 1000), // RMT counter clock frequency
-        .mem_block_symbols = 64, // the memory block size used by the RMT channel
-        .flags = {
-            .with_dma = 1,     // Using DMA can improve performance when driving more LEDs
+        //Check if matching task found
+        if (k >= 0) {
+            uint32_t task_elapsed_time = end_array[k].ulRunTimeCounter - start_array[i].ulRunTimeCounter;
+            uint32_t percentage_time = (task_elapsed_time * 100UL) / (total_elapsed_time * CONFIG_FREERTOS_NUMBER_OF_CORES);
+            printf("| %s | %"PRIu32" | %"PRIu32"%%\n", start_array[i].pcTaskName, task_elapsed_time, percentage_time);
         }
-    };
+    }
 
-    // LED Strip object handle
-    led_strip_handle_t led_strip;
-    ESP_ERROR_CHECK(led_strip_new_rmt_device(&strip_config, &rmt_config, &led_strip));
-    ESP_LOGI(TAG, "Created LED strip object with RMT backend");
+    //Print unmatched tasks
+    for (int i = 0; i < start_array_size; i++) {
+        if (start_array[i].xHandle != NULL) {
+            printf("| %s | Deleted\n", start_array[i].pcTaskName);
+        }
+    }
+    for (int i = 0; i < end_array_size; i++) {
+        if (end_array[i].xHandle != NULL) {
+            printf("| %s | Created\n", end_array[i].pcTaskName);
+        }
+    }
+    ret = ESP_OK;
 
-    return led_strip;
+exit:    //Common return path
+    free(start_array);
+    free(end_array);
+    return ret;
 }
+
+
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+
 
 void app_main(void)
 {
 
-ESP_LOGI(TAG, "__app main");
+    ESP_LOGI(TAG, "__app main");
 
-/// Create the LED strip object
- led_strip_handle_t led_strip = configure_led();
+    //wifi_init_apsta();
 
-led_strip_set_pixel(led_strip, 0, 50, 0, 0);
-led_strip_set_pixel(led_strip, 1, 0, 50, 0);
-led_strip_set_pixel(led_strip, 2, 0, 0, 50);
-led_strip_set_pixel(led_strip, 3, 0, 0, 0);
-led_strip_set_pixel(led_strip, 4, 50, 0, 0);
-led_strip_set_pixel(led_strip, 5, 0, 50, 0);
-led_strip_set_pixel(led_strip, 6, 0, 0, 50);
-led_strip_set_pixel(led_strip, 7, 0, 0, 0);
-led_strip_set_pixel(led_strip, 8, 50, 0, 0);
-led_strip_set_pixel(led_strip, 9, 0, 50, 0);
+    ui_init();
 
-    int nLeds = 54;
-    for(int q = 0; q < nLeds; q++){
-        
-        RGBColor c = hslToRgb(360.0 * q / nLeds, 90, 10);
-
-       // RGBColor c = hslToRgb(36, 90, 10);
-
-        led_strip_set_pixel(led_strip, q, c.r, c.g, c.b);
-
-    }
-
-led_strip_refresh(led_strip);
-
-
-  //  OLED_init();
-  //  OLED_Clear(0,7);
-  //  OLED_WriteBig( "tits!", 3, 3);
-
-    
-
-    // for(int q = 0; q < 11; q++){
-    //     led_strip_pixels[q] = 0; // clear the led strip pixels
-    //     RGBColor c = hslToRgb(360 * q / 12.0, 90, 30);
-    //     led_strip_pixels[q*4 + 0] = c.r;
-    //     led_strip_pixels[q*4 + 1] = c.g;
-    //     led_strip_pixels[q*4 + 2] = c.b;
-    //     led_strip_pixels[q*4 + 3] = 20;
-
-    // }
-
-    // for(int q = 0; q < 11; q++){
-    //     led_strip_pixels[q] = 0; // clear the led strip pixels
-    //     //RGBColor c = hslToRgb(360 * q / 12.0, 90, 30);
-    //     led_strip_pixels[48 + q*3 + 0] = 55;
-    //     led_strip_pixels[48 + q*3 + 1] = 0;
-    //     led_strip_pixels[48 + q*3 + 2] = 0;
-        
-
-    // }
-
-    
-    // OLED_init();
-    // ESP_LOGI(TAG, "oled");
-
-    // OLED_WriteBig( "poop", 0, 0);
-    
-    // write_leds();
-
-    init_sd();
-    ESP_LOGI(TAG, "sd");
-
-    wifi_init_apsta();
-
-    init_rotary_encoder(NULL);
-ESP_LOGI(TAG, "rotor");
-
-    ESP_LOGI(TAG, "ESPLOGI");
+    tv_init();
 
     TaskHandle_t hSupervisor;
     xTaskCreatePinnedToCore(supervisor, "supervisor", 10*1024, NULL, tskIDLE_PRIORITY, &hSupervisor, tskNO_AFFINITY);
@@ -136,6 +122,9 @@ ESP_LOGI(TAG, "rotor");
 
     while (1) {
         vTaskDelay(pdMS_TO_TICKS(500));
+
+        //print_real_time_stats(1000 / portTICK_PERIOD_MS);
+
     }
 }
 

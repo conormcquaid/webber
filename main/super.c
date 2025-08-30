@@ -68,19 +68,21 @@ void update_page_hue(void) {
 
 #define SUPER_SLEEP 25
 
+extern void wifi_init_apsta(void);
+
 void supervisor(void* params){
 
     // setup
-    int event_count; // event count from the rotary encoder
+    
 
     const int hue_increment = 45;
     qSuperMessage = xQueueCreate(10, sizeof(void*));
     char* msg;
 
-    OLED_init();
-    ESP_LOGI(TAG, "oled");
 
-    OLED_WriteBig( "poop", 0, 0);
+
+    //TODO: enable me 
+    wifi_init_apsta();
 
     // for(int q = 0; q < 54; q++){
     //     led_strip_pixels[q] = 0; // clear the led strip pixels
@@ -95,24 +97,11 @@ void supervisor(void* params){
     // static int wait = 1000;
     // static int en = 0;
 
-    current_ui_state->init();  
 
     // go
     while(1){
 
-        if (xQueueReceive(qRotor, &event_count, 0)){
-
-            hue = hue + (event_count < 0 ? -hue_increment : hue_increment);
-            hue = hue % 360;
-            ESP_LOGI(TAG, "Setting new hue: %d", hue);
-            RGBColor rgbc = hslToRgb(hue, 90, 30);
-            
-            //set_the_led(rgbc.r, rgbc.g, rgbc.b);
-
-            update_page_hue();
-
-        }
-        if(xQueueReceive(qSuperMessage, &msg, 0)){
+        while(xQueueReceive(qSuperMessage, &msg, 0)){
             ESP_LOGI(TAG, "Received super message: %s", msg);
             // do something with the super message
             if(!msg){
@@ -141,27 +130,9 @@ void supervisor(void* params){
                 ESP_LOGI(TAG, "Status message: %s", status->valuestring);
 
             }
-
-
-
+            cJSON_Delete(json);
             free(msg); // free the message after processing
         }
-
-        // if(wait){
-        //     wait--;
-        // }else{
-            
-        //    // led_strip_pixels[en] = 0;
-        //     en ++;
-        //     ESP_LOGI(TAG, "Setting byte %d", en);
-        //    /// led_strip_pixels[en] = 55;
-        //    // write_leds();
-        //     wait = 100;
-        // }
-
-        current_ui_state->tick(SUPER_SLEEP);   
-        
-        //ESP_LOGI(TAG, "SuperSleep");
 
         vTaskDelay( SUPER_SLEEP / portTICK_PERIOD_MS);
     }    

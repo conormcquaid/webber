@@ -247,6 +247,10 @@ void wifi_init_apsta(void){
     /* Initialize AP */
     ESP_LOGI(TAG_AP, "ESP_WIFI_MODE_AP");
     esp_netif_t *esp_netif_ap = wifi_init_softap();
+    if(esp_netif_ap == NULL){
+        ESP_LOGE(TAG_AP, "Failed to initialize AP");
+        return;
+    }
 
     /* Initialize STA */
     ESP_LOGI(TAG_STA, "ESP_WIFI_MODE_STA");

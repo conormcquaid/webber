@@ -13,10 +13,12 @@
 
 esp_err_t init_sd(void);
 
-uint8_t getFrame(uint8_t * pFrame);
+int getFrame(uint8_t * pFrame);
 
 char* getNextFilename(char* f, size_t l);
 
 int set_cur_file(char *fname);
+
+void open_next_file(void);
 
 #endif /* MAIN_SDCARD_H_ */

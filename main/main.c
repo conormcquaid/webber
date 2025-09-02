@@ -102,14 +102,12 @@ exit:    //Common return path
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-
+extern void wifi_init_apsta(void);
 
 void app_main(void)
 {
 
     ESP_LOGI(TAG, "__app main");
-
-    //wifi_init_apsta();
 
     ui_init();
 
@@ -119,6 +117,12 @@ void app_main(void)
     xTaskCreatePinnedToCore(supervisor, "supervisor", 10*1024, NULL, tskIDLE_PRIORITY, &hSupervisor, tskNO_AFFINITY);
     // TaskHandle_t hTV;
     // xTaskCreate(tv_task, "tv_task", 10*1024, NULL, tskIDLE_PRIORITY, &hTV);
+
+    // time suck goes last
+
+
+
+    //wifi_init_apsta();
 
     while (1) {
         vTaskDelay(pdMS_TO_TICKS(500));

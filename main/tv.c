@@ -5,7 +5,33 @@
 
 static const char* TAG = "teevee";
 
+uint8_t* currFB;
+uint8_t* prevFB;
+uint8_t* renderFB;
+float* delta;
+uint32_t frame_count;
+
 #define BLINK_GPIO 21
+
+
+
+tv_config_block_t tv_config_block = {
+    .rotor_dir = ROTOR_DIR_CW,
+    .rotor_clicks = ROTOR_CLICKS_FOUR,
+    .resolution = TV_RESOLUTION_HIGH,
+    .interpolation = TV_INTERPOLATE_NONE,
+   // .interpolation = TV_INTERPOLATE_LINEAR_RGB,
+    .mode = TV_MODE_SEQUENTIAL,
+    .speed = {
+        .tweens = 5,
+        .interframe_millis = 41
+    },
+    .bytes_per_LED = 3 
+};
+
+int g_frame_size;
+static int nLEDs;
+static led_strip_handle_t led_strip;
 
 led_strip_handle_t configure_led(void)
 {
@@ -41,31 +67,198 @@ led_strip_handle_t configure_led(void)
 
 void tv_init(void){
 
-    init_sd();
+    g_frame_size = (tv_config_block.resolution == TV_RESOLUTION_HIGH ? FRAME_RESOLUTION_HIGH : FRAME_RESOLUTION_LOW) * tv_config_block.bytes_per_LED;
+    nLEDs = (tv_config_block.resolution == TV_RESOLUTION_HIGH ? FRAME_RESOLUTION_HIGH : FRAME_RESOLUTION_LOW);
 
-    led_strip_handle_t led_strip = configure_led();
+    esp_err_t e = init_sd();
 
-    led_strip_set_pixel(led_strip, 0, 50, 0, 0);
-    led_strip_set_pixel(led_strip, 1, 0, 50, 0);
-    led_strip_set_pixel(led_strip, 2, 0, 0, 50);
-    led_strip_set_pixel(led_strip, 3, 0, 0, 0);
-    led_strip_set_pixel(led_strip, 4, 50, 0, 0);
-    led_strip_set_pixel(led_strip, 5, 0, 50, 0);
-    led_strip_set_pixel(led_strip, 6, 0, 0, 50);
-    led_strip_set_pixel(led_strip, 7, 0, 0, 0);
-    led_strip_set_pixel(led_strip, 8, 50, 0, 0);
-    led_strip_set_pixel(led_strip, 9, 0, 50, 0);
+    if(e != ESP_OK){
+        ESP_LOGE(TAG, "SD Card init failed, setting TV mode to OFF");
+        tv_config_block.mode = TV_MODE_LAMP;
+    }
 
-        int nLeds = 54;
-        for(int q = 0; q < nLeds; q++){
+    led_strip = configure_led();
+
+    for(int q = 0; q < nLEDs; q++){
             
-            RGBColor c = hslToRgb(360.0 * q / nLeds, 90, 10);
+        RGBColor c = hslToRgb(360.0 * q / nLEDs, 90, 10);
 
-        // RGBColor c = hslToRgb(36, 90, 10);
+    // RGBColor c = hslToRgb(36, 90, 10);
 
-            led_strip_set_pixel(led_strip, q, c.r, c.g, c.b);
+        led_strip_set_pixel(led_strip, q, c.r, c.g, c.b);
+
+    }
+
+    led_strip_refresh(led_strip);
+
+    xTaskCreatePinnedToCore(tv_task, "tv_task", 4096, NULL, 5, NULL, 1);
+}
+
+
+
+void tv_open_next_file(void){
+
+    // TODO: depends on tv mode being seq, rand, loop
+    open_next_file();
+
+    frame_count = 0;
+
+}
+///////////////////////////////////////////////////////////////////////////////////////////
+void interpolate_linear_rgb(int tween){
+       
+    assert(tv_config_block.bytes_per_LED = 3);
+    // TODO: really should be dealing with LED structs which have 4 bytes, may use only 3. FBs should be arrays of these
+
+    int tweens = tv_config_block.speed.tweens;
+    tweens = (tweens < 1) ? 1 : tweens;
+
+    if(tween == 0){
+        // 'from' buffer init
+        memcpy(prevFB, currFB, g_frame_size);
+
+        // useless  memset(delta, 0, g_frame_size * sizeof(float));
+        for(int i = 0; i < g_frame_size; i++){
+            delta[i] =  (currFB[i] - prevFB[i]) / (1.0 *  tweens); 
+        }
+    }
+    ESP_LOGI(TAG, "PrevR1: %02x, CurrR1: %02x Delta:%3.3f",prevFB[0], currFB[0], delta[0]);
+
+    for(int i = 0; i < nLEDs; i++){
+
+        uint8_t r,g,b;
+        r = prevFB[3*i]   + (uint8_t)(tween * delta[3*i]); 
+        g = prevFB[3*i+1] + (uint8_t)(tween * delta[3*i+1]);
+        b = prevFB[3*i+2] + (uint8_t)(tween * delta[3*i+2]);
+
+        led_strip_set_pixel(led_strip, i , r, g, b);
+    }
+    
+    led_strip_refresh(led_strip);
+
+    memcpy(prevFB, currFB, g_frame_size);
+
+}
+
+extern void gamma_correct(uint8_t* r, uint8_t* g, uint8_t* b);
+
+void tv_task(void* param){
+
+    currFB   = malloc(g_frame_size);
+    prevFB   = malloc(g_frame_size);
+    renderFB = malloc(g_frame_size);
+    delta    = malloc(g_frame_size);
+
+    static int one_second_accum;  //TODO : counter to trigger ws update
+
+    if(!currFB || !prevFB){
+        tv_config_block.mode = TV_MODE_LAMP;
+    }
+
+    tv_open_next_file();
+
+    while(1){
+
+        if(tv_config_block.mode == TV_MODE_OFF){
+            for(int q = 0; q < nLEDs; q++){
+                led_strip_set_pixel(led_strip, q, 0, 0, 0);
+            }
+            led_strip_refresh(led_strip);
+
+        } else if(tv_config_block.mode == TV_MODE_LAMP){
+
+            static float n = 0.0;
+            
+            for(int q = 0; q < nLEDs; q++){
+            
+                RGBColor c = hslToRgb(n + 360.0 * (q) / nLEDs, 90, 10);
+
+                led_strip_set_pixel(led_strip, q, c.r, c.g, c.b);
+
+                n=n+0.01;
+
+            }
+            // for(int q = 0; q < nLEDs; q++){
+            //     led_strip_set_pixel(led_strip, q, lamp_rgbc.r, lamp_rgbc.g, lamp_rgbc.b);
+            // }
+            led_strip_refresh(led_strip);
+
+            vTaskDelay(pdMS_TO_TICKS(tv_config_block.speed.interframe_millis));
+
+
+        } else if(tv_config_block.mode == TV_MODE_LIFE){
+            // Conway's Game of Life mode
+
+        }else{ // in actual TV mode
+
+            // read a frame
+            int r = getFrame(currFB);
+            if(r != g_frame_size){
+
+                // focus on: main control menu and reporting system settings?
+                // config settings for new board bringup (possibly even new boards?)
+                // rgb test files for interpolation implies ability to choose playback file!
+
+                ESP_LOGE(TAG, "Frame read size %d does not match expected %d", r, g_frame_size);
+                // try to recover by opening next file
+                if(r == -1){ // eof
+                    tv_open_next_file();
+
+                }
+                if( r == -2){
+                    //card read error
+
+                    //reboot will fall back to non-tv status if sd card is not initialized ok
+
+                    //TODO: check for sd det
+                    // TDOD: set appropriate tv mode if no sd card
+                    esp_restart();
+                }
+            }
+            frame_count++;
+            // customize behavior based on interpolation mode
+
+            if(tv_config_block.interpolation == TV_INTERPOLATE_NONE){
+                uint8_t* pPixel = currFB;
+                for(int p = 0; p < nLEDs; p++){
+
+                    uint8_t r,g,b;
+                    r = *pPixel;
+                    g = *(pPixel + 1);
+                    b = *(pPixel + 2);
+                    gamma_correct(&r, &g, &b);
+                    
+                    led_strip_set_pixel(led_strip, p, r, g, b);
+                    pPixel += tv_config_block.bytes_per_LED;
+                    
+                    led_strip_refresh(led_strip);
+
+                }
+            }else if(tv_config_block.interpolation == TV_INTERPOLATE_LINEAR_RGB ){
+
+                for(int i = 0; i < tv_config_block.speed.tweens; i++){
+                    interpolate_linear_rgb(i);
+                    
+                }
+            }
+
+
+            
 
         }
 
-    led_strip_refresh(led_strip);
+
+        // once a second or so, we should push progress notification to web and gui info block
+        vTaskDelay(pdMS_TO_TICKS(tv_config_block.speed.interframe_millis));
+    }
+
 }
+
+void tv_play_file(const char* path);
+void tv_set_mode(tv_mode_t mode);
+void tv_set_state(tv_state_t state);
+tv_mode_t tv_get_mode(void);
+void tv_task(void* p);
+void tv_set_speed(tv_speed_t speed);
+tv_speed_t tv_get_speed(void);
+tv_state_t tv_get_state(void);

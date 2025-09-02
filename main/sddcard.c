@@ -22,18 +22,18 @@
 #include "dirent.h"
 #include <errno.h>
 #include "sdcard.h"
+#include "main.h"
 
 static const char* TAG = "sdcard";
 
 #define MOUNT_POINT "/sdcard"
 
-#define FRAME_SIZE_HIGH ()
-#define FRAME_SIZE_LOW ()
 
-int frame_size;
 
 DIR* dirp;
 FILE* f = NULL;
+int file_count = 0;
+static uint32_t frame_number = 0;
 
 void enumerate_files(void){
     struct dirent* dint;
@@ -45,6 +45,7 @@ void enumerate_files(void){
             snprintf(fname, sizeof(fname) - 10, "%.10s/%.240s", MOUNT_POINT, dint->d_name);
             if(stat(fname, &st) == 0){
                 ESP_LOGI(TAG, "Found file: %s, size %ld", dint->d_name, st.st_size);
+                file_count++;
                 if(st.st_size % 54 == 0){
                     ESP_LOGI(TAG, "File %s may be high-def*", dint->d_name);
                 } else if(st.st_size % 15 == 0){
@@ -61,6 +62,7 @@ void enumerate_files(void){
     }
 }
 
+//TODO: handle errors from here
 void open_next_file(void) {
     if(f) {
         fclose(f);
@@ -70,12 +72,16 @@ void open_next_file(void) {
     if (getNextFilename(fname, sizeof(fname)) != NULL) {
         if (set_cur_file(fname)) {
             ESP_LOGI(TAG, "Opened file %s successfully", fname);
+
+            memcpy(tv_status.current_file, fname, 260); //TODO: this is already statically allocated...
+
         } else {
             ESP_LOGE(TAG, "Failed to open file %s", fname);
         }
     } else {
         ESP_LOGI(TAG, "No more files to open");
     }
+    frame_number = 0;
 }
 
 
@@ -140,7 +146,7 @@ esp_err_t init_sd(void){
                      "Make sure SD card lines have pull-up resistors in place.", esp_err_to_name(ret));
 
             //check_sd_card_pins(&config, pin_count);
-#
+
         }
         return ret;
     }
@@ -167,24 +173,40 @@ esp_err_t init_sd(void){
 
 
 
-uint8_t getFrame(uint8_t * pFrame){
+int getFrame(uint8_t * pFrame){
 
-	static uint32_t frame_number = 0;
+	
+
 	if(feof(f)){
 		printf("Seek start\n");
+
+        // TODO: return NULL here and let caller handle end of file
 		fseek(f, SEEK_SET, 0);
 		frame_number = 0;
 	}
 	// read 5x5 LEDs worth of data = 5x5x4 bytes
-	int r = fread( pFrame, 1, 100, f);
+	int r = fread( pFrame, 1, g_frame_size, f);
+
+
 	
 	//char num[16];
 	//sprintf(num, "%d", frame_number);
-    printf("Frame: %04ld\n", frame_number);
+    if((frame_number % 32) == 0){
+         printf("Frame: %04ld\n", frame_number);
+    }
+
 	//OLED_WriteBig(num,2,0);
 	
 	frame_number++;
 
+    if(feof(f)){
+        printf("End of file reached\n");
+        return -1;
+    }
+    if(ferror(f)){
+        printf("Error reading file\n");
+        return -2;
+    }
 	return r;
 }
 

@@ -15,6 +15,7 @@
 
 static char* TAG = "super";
 int hue = 0;
+tv_status_t tv_status;
 
 QueueHandle_t qSuperMessage;
 
@@ -66,6 +67,8 @@ void update_page_hue(void) {
     ws_notify(hue_msg);
 }
 
+RGBColor lamp_rgbc;
+
 #define SUPER_SLEEP 25
 
 extern void wifi_init_apsta(void);
@@ -73,16 +76,20 @@ extern void wifi_init_apsta(void);
 void supervisor(void* params){
 
     // setup
+    g_frame_size = (tv_config_block.resolution = TV_RESOLUTION_HIGH ? FRAME_RESOLUTION_HIGH : FRAME_RESOLUTION_LOW) * tv_config_block.bytes_per_LED;
     
 
     const int hue_increment = 45;
     qSuperMessage = xQueueCreate(10, sizeof(void*));
     char* msg;
 
+    
+    memset(&tv_status, 0, sizeof tv_status);
+
 
 
     //TODO: enable me 
-    wifi_init_apsta();
+    
 
     // for(int q = 0; q < 54; q++){
     //     led_strip_pixels[q] = 0; // clear the led strip pixels
@@ -121,7 +128,7 @@ void supervisor(void* params){
             if(hue_item && cJSON_IsNumber(hue_item)){
                 hue = hue_item->valueint;
                 ESP_LOGI(TAG, "Setting new hue from message: %d", hue);
-                RGBColor rgbc = hslToRgb(hue, 90, 30);
+                RGBColor lamp_rgbc = hslToRgb(hue, 90, 30);
                 
                 //set_the_led(rgbc.r, rgbc.g, rgbc.b);
             }

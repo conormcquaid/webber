@@ -17,5 +17,6 @@ void OLED_init(void);
 void OLED_fill(uint8_t start, uint8_t end, uint8_t* source, bool inverse);
 void OLED_Clear(int start_line, int end_line);
 void OLED_WriteBig( char* s, uint8_t line, uint8_t charpos, bool invert);
-
+void OLED_fill2(uint8_t start_column, uint8_t end_column, uint8_t start_line, uint8_t end_line, uint8_t* source, bool inverse);
+void OLED_WriteSmall(char* s, uint8_t line, uint8_t charpos, bool invert);
 #endif /* __I2C_OLED__ */

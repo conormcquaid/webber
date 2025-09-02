@@ -141,7 +141,7 @@ void OLED_fill(uint8_t start_line, uint8_t end_line, uint8_t* source, bool inver
 		// make our own data buffer
 
         for(int y=0; y < 128 * 8; y++){
-            *buf++ = 0x01;
+            *buf++ = inverse ? 0xff : 0x00;
         }
     }else{
 		// use supplied data buffer
@@ -158,6 +158,54 @@ void OLED_fill(uint8_t start_line, uint8_t end_line, uint8_t* source, bool inver
 
     }
     ESP_ERROR_CHECK(i2c_master_transmit(dev_handle,i2c_oled_buffer, (1 + 128 * 8), 666));
+    // i2c_master_transmit_multi_buffer_info_t biff[2] = {
+    //     { .write_buffer = cmds, .buffer_size = sizeof(cmds) },
+    //     { .write_buffer = i2c_oled_buffer,  .buffer_size = 128 * 8}
+    // };
+    // ESP_ERROR_CHECK(i2c_master_multi_buffer_transmit(dev_handle, biff, 2, 666));
+}
+
+void OLED_fill2(uint8_t start_column, uint8_t end_column, uint8_t start_line, uint8_t end_line, uint8_t* source, bool inverse){
+
+    //uint8_t cmds[] = {0x00, 0x21, 0x00, 0x00, 0x00, 0x7F, 0x00, 0x22, start_line, end_line};
+    //ESP_ERROR_CHECK(i2c_master_transmit( dev_handle, cmds, sizeof(cmds), 666));
+
+	command( 0x21); // SSD1306_COLUMNADDR
+	command( start_column);    // column start
+	command( end_column);  // column end
+	command( 0x22); // SSD1306_PAGEADDR
+	command( start_line);    // page start
+	command( end_line);      // page end (8 pages for 64 rows OLED)
+    
+    // henceforth comes the data...
+    uint8_t* buf = i2c_oled_buffer;
+	*buf++ = 0x40; // data mode
+
+	int num_bytes = (end_line - start_line) * (end_column - start_column + 1);
+    
+	
+    if(!source){
+		// make our own data buffer
+
+        for(int y=0; y < 128 * 8; y++){
+            *buf++ = 0xaa;
+        }
+    }else{
+		// use supplied data buffer
+		if(inverse){
+			for(int y = 0; y < num_bytes; y++){
+				*buf++ = ~(*source++);
+			}
+			
+		}else{
+			for(int y = 0; y < num_bytes; y++){
+				*buf++ = *source++;
+			}
+		}
+
+    }
+	
+    ESP_ERROR_CHECK(i2c_master_transmit(dev_handle,i2c_oled_buffer, (1 + num_bytes), 666));
     // i2c_master_transmit_multi_buffer_info_t biff[2] = {
     //     { .write_buffer = cmds, .buffer_size = sizeof(cmds) },
     //     { .write_buffer = i2c_oled_buffer,  .buffer_size = 128 * 8}
@@ -282,6 +330,34 @@ void OLED_WriteBig( char* s, uint8_t line, uint8_t charpos, bool invert){
 
 }
 
+void OLED_WriteSmall( char* s, uint8_t line, uint8_t charpos, bool invert){
 
+	uint8_t c;
+	uint8_t buf[6];
+	buf[0]=0x40;
+	uint8_t xpos = charpos * 5;
+	while(*s){
+		c = *s;
+		if(c < 0x20){ c = 0x20; }
+		c = c - 0x20; // font begins with spac
+
+		for(int i = 0; i < 5; i++){
+			uint8_t tmp = font5x8[c*5 + i];
+			buf[i+1] = invert ? ~tmp : tmp;
+		}
+		command(0x21);
+		command(xpos);
+		command(xpos+6);
+		command(0x22);
+		command(line);
+		command(line);
+
+		ESP_ERROR_CHECK(i2c_master_transmit( dev_handle, buf, sizeof(buf), 666));
+
+		xpos += 5;
+		s++;
+        
+	}
+}
 
 

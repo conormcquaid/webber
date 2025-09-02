@@ -39,7 +39,7 @@ static bool example_pcnt_on_reach(pcnt_unit_handle_t unit, const pcnt_watch_even
 
     ui_event_t evt;
     evt.type = (edata->watch_point_value > 0) ? UI_ROTOR_INC : UI_ROTOR_DEC;
-    evt.param = (void*)&(edata->watch_point_value);
+    evt.param = (void*)(edata->watch_point_value);
 
     xQueueSendFromISR(queue, &evt, &high_task_wakeup);
     //TODO: clear count??
@@ -100,7 +100,7 @@ void init_rotary_encoder(void* p)
 
      ESP_LOGI(TAG, "add watch points and register callbacks");
 //  //   int watch_points[] = {EXAMPLE_PCNT_LOW_LIMIT, -50, 0, 50, EXAMPLE_PCNT_HIGH_LIMIT};
-    int watch_points[] = {EXAMPLE_PCNT_HIGH_LIMIT, EXAMPLE_PCNT_LOW_LIMIT};
+    int watch_points[] = {tv_config_block.rotor_clicks, -tv_config_block.rotor_clicks};
 
      for (size_t i = 0; i < sizeof(watch_points) / sizeof(watch_points[0]); i++) {
          ESP_ERROR_CHECK(pcnt_unit_add_watch_point(pcnt_unit, watch_points[i]));

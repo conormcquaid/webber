@@ -12,6 +12,24 @@
 
 #define MDNS_HOSTNAME "tv-remote"
 
+#define FRAME_RESOLUTION_HIGH (6*9)
+#define FRAME_RESOLUTION_LOW (3*5)
+
+extern int g_frame_size;
+
+typedef struct{
+
+    char     current_file[260];
+    uint32_t file_size_bytes;
+    uint32_t file_frame_count;
+    uint32_t frame_number;
+    char     ip_addr[16];
+    char     ssid[32];
+
+}tv_status_t;
+
+extern tv_status_t tv_status;
+
 typedef union{
     uint32_t color;
     struct {
@@ -21,6 +39,62 @@ typedef union{
         uint8_t a;
     };
 } RGBColor;
+
+extern RGBColor lamp_rgbc;
+
+typedef enum{ 
+    ROTOR_DIR_NONE,
+    ROTOR_DIR_CW,
+    ROTOR_DIR_CCW
+}rotor_dir_t;
+
+typedef enum{
+    ROTOR_CLICKS_NONE,
+    ROTOR_CLICKS_TWO,
+    ROTOR_CLICKS_FOUR
+}rotor_clicks_t;
+
+typedef enum {
+    TV_RESOLUTION_LOW, // 3x5
+    TV_RESOLUTION_HIGH // 6x9
+}tv_resolution_t;
+
+typedef enum{
+    TV_INTERPOLATE_NONE,
+    TV_INTERPOLATE_LINEAR_RGB,
+    TV_INTERPOLATE_LINEAR_HSV,
+    TV_INTERPOLATE_CIE_RGB,
+    TV_INTERPOLATE_CIE_LAB
+}tv_interpolation_t;
+
+typedef enum {
+    TV_MODE_SEQUENTIAL,
+    TV_MODE_LOOP,
+    TV_MODE_RANDOM,
+    TV_MODE_LAMP, /* have a solid hue?*/
+    TV_MODE_LIFE, /* Conway FTW */
+    TV_MODE_OFF /* sure, why not? */
+}tv_mode_t;
+
+typedef struct{
+    uint8_t tweens; // 1-10
+    uint16_t interframe_millis; 
+}tv_speed_t;
+
+typedef struct{
+    rotor_dir_t rotor_dir;
+    rotor_clicks_t rotor_clicks;
+    tv_resolution_t resolution;
+    tv_interpolation_t interpolation;
+    tv_mode_t mode;
+    tv_speed_t speed;
+    uint8_t bytes_per_LED;
+}tv_config_block_t;
+
+// globally accessible config block
+// persisted in NVS
+extern tv_config_block_t tv_config_block;
+
 
 extern QueueHandle_t qSuperMessage;
 extern QueueHandle_t qRotor; // notify of rotary encoder events

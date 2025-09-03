@@ -109,9 +109,7 @@ void app_main(void)
 
     ESP_LOGI(TAG, "__app main");
 
-    ui_init();
 
-    tv_init();
 
     TaskHandle_t hSupervisor;
     xTaskCreatePinnedToCore(supervisor, "supervisor", 10*1024, NULL, tskIDLE_PRIORITY, &hSupervisor, tskNO_AFFINITY);

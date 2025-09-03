@@ -5,22 +5,23 @@
 
 static const char* TAG = "teevee";
 
-uint8_t* currFB;
-uint8_t* prevFB;
-uint8_t* renderFB;
-float* delta;
-uint32_t frame_count;
+static uint8_t* currFB;
+static uint8_t* prevFB;
+static uint8_t* renderFB;
+static float*   delta;
+static uint32_t frame_count; // TODO: get this from the getting place
 
 #define BLINK_GPIO 21
 
+extern void gamma_bright_correct(uint8_t* r, uint8_t* g, uint8_t* b, float bright);
 
 
 tv_config_block_t tv_config_block = {
     .rotor_dir = ROTOR_DIR_CW,
     .rotor_clicks = ROTOR_CLICKS_FOUR,
     .resolution = TV_RESOLUTION_HIGH,
-    .interpolation = TV_INTERPOLATE_NONE,
-   // .interpolation = TV_INTERPOLATE_LINEAR_RGB,
+    //.interpolation = TV_INTERPOLATE_NONE,
+    .interpolation = TV_INTERPOLATE_LINEAR_RGB,
     .mode = TV_MODE_SEQUENTIAL,
     .speed = {
         .tweens = 5,
@@ -65,7 +66,7 @@ led_strip_handle_t configure_led(void)
 }
 
 
-void tv_init(void){
+void tv_init(tv_status_t* tv_status){
 
     g_frame_size = (tv_config_block.resolution == TV_RESOLUTION_HIGH ? FRAME_RESOLUTION_HIGH : FRAME_RESOLUTION_LOW) * tv_config_block.bytes_per_LED;
     nLEDs = (tv_config_block.resolution == TV_RESOLUTION_HIGH ? FRAME_RESOLUTION_HIGH : FRAME_RESOLUTION_LOW);
@@ -91,25 +92,30 @@ void tv_init(void){
 
     led_strip_refresh(led_strip);
 
-    xTaskCreatePinnedToCore(tv_task, "tv_task", 4096, NULL, 5, NULL, 1);
+    xTaskCreatePinnedToCore(tv_task, "tv_task", 4096, tv_status, 5, NULL, 1);
 }
 
 
 
-void tv_open_next_file(void){
+void tv_open_next_file(tv_status_t* pTV){
 
     // TODO: depends on tv mode being seq, rand, loop
-    open_next_file();
+    open_next_file(pTV);
 
     frame_count = 0;
 
 }
 ///////////////////////////////////////////////////////////////////////////////////////////
+
+/*
+  Called for each tween
+*/
 void interpolate_linear_rgb(int tween){
        
     assert(tv_config_block.bytes_per_LED = 3);
     // TODO: really should be dealing with LED structs which have 4 bytes, may use only 3. FBs should be arrays of these
 
+    // memoize tweens and validate
     int tweens = tv_config_block.speed.tweens;
     tweens = (tweens < 1) ? 1 : tweens;
 
@@ -117,8 +123,9 @@ void interpolate_linear_rgb(int tween){
         // 'from' buffer init
         memcpy(prevFB, currFB, g_frame_size);
 
-        // useless  memset(delta, 0, g_frame_size * sizeof(float));
+        //calculate linear deltas
         for(int i = 0; i < g_frame_size; i++){
+
             delta[i] =  (currFB[i] - prevFB[i]) / (1.0 *  tweens); 
         }
     }
@@ -131,6 +138,8 @@ void interpolate_linear_rgb(int tween){
         g = prevFB[3*i+1] + (uint8_t)(tween * delta[3*i+1]);
         b = prevFB[3*i+2] + (uint8_t)(tween * delta[3*i+2]);
 
+        // TODO: fixmeup gamma_bright_correct(&r, &g, &b, pTV->brightness);
+
         led_strip_set_pixel(led_strip, i , r, g, b);
     }
     
@@ -140,9 +149,10 @@ void interpolate_linear_rgb(int tween){
 
 }
 
-extern void gamma_correct(uint8_t* r, uint8_t* g, uint8_t* b);
 
 void tv_task(void* param){
+
+    tv_status_t* pTV = (tv_status_t*)param;
 
     currFB   = malloc(g_frame_size);
     prevFB   = malloc(g_frame_size);
@@ -155,7 +165,7 @@ void tv_task(void* param){
         tv_config_block.mode = TV_MODE_LAMP;
     }
 
-    tv_open_next_file();
+    tv_open_next_file(pTV);
 
     while(1){
 
@@ -202,7 +212,7 @@ void tv_task(void* param){
                 ESP_LOGE(TAG, "Frame read size %d does not match expected %d", r, g_frame_size);
                 // try to recover by opening next file
                 if(r == -1){ // eof
-                    tv_open_next_file();
+                    tv_open_next_file(pTV);
 
                 }
                 if( r == -2){
@@ -226,7 +236,7 @@ void tv_task(void* param){
                     r = *pPixel;
                     g = *(pPixel + 1);
                     b = *(pPixel + 2);
-                    gamma_correct(&r, &g, &b);
+                    gamma_bright_correct(&r, &g, &b, pTV->brightness);
                     
                     led_strip_set_pixel(led_strip, p, r, g, b);
                     pPixel += tv_config_block.bytes_per_LED;
@@ -238,7 +248,7 @@ void tv_task(void* param){
 
                 for(int i = 0; i < tv_config_block.speed.tweens; i++){
                     interpolate_linear_rgb(i);
-                    
+                    vTaskDelay(pdMS_TO_TICKS(tv_config_block.speed.interframe_millis));                    
                 }
             }
 
@@ -258,7 +268,11 @@ void tv_play_file(const char* path);
 void tv_set_mode(tv_mode_t mode);
 void tv_set_state(tv_state_t state);
 tv_mode_t tv_get_mode(void);
-void tv_task(void* p);
-void tv_set_speed(tv_speed_t speed);
-tv_speed_t tv_get_speed(void);
+
+void tv_set_speed(tv_status_t* tv_status, tv_speed_t speed){
+    tv_status->speed = speed;
+}
+tv_speed_t tv_get_speed(tv_status_t* tv_status){
+    return tv_status->speed;
+}
 tv_state_t tv_get_state(void);

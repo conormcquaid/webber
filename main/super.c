@@ -12,6 +12,7 @@
 #include "sdcard.h"
 #include "led_strip.h"
 #include "oled_i2c.h"
+#include "tv.h"
 
 static char* TAG = "super";
 int hue = 0;
@@ -23,42 +24,9 @@ int get_hue(void){
     return hue;
 }
 
-RGBColor hslToRgb(float h, float s, float l) {
-    float r, g, b;
-    float c, x, m;
+RGBColor lamp_rgbc;
+extern RGBColor hslToRgb(float h, float s, float l);
 
-    h = fmod(h, 360.0f); // Ensure hue is within 0-360
-    if (h < 0) {
-        h += 360.0f;
-    }
-    s /= 100.0f;
-    l /= 100.0f;
-
-    c = (1.0f - fabs(2.0f * l - 1.0f)) * s;
-    x = c * (1.0f - fabs(fmod(h / 60.0f, 2.0f) - 1.0f));
-    m = l - c / 2.0f;
-
-    if (h >= 0.0f && h < 60.0f) {
-        r = c, g = x, b = 0.0f;
-    } else if (h >= 60.0f && h < 120.0f) {
-        r = x, g = c, b = 0.0f;
-    } else if (h >= 120.0f && h < 180.0f) {
-        r = 0.0f, g = c, b = x;
-    } else if (h >= 180.0f && h < 240.0f) {
-        r = 0.0f, g = x, b = c;
-    } else if (h >= 240.0f && h < 300.0f) {
-        r = x, g = 0.0f, b = c;
-    } else {
-        r = c, g = 0.0f, b = x;
-    }
-
-    RGBColor color;
-    color.r = (int)((r + m) * 255.0f);
-    color.g = (int)((g + m) * 255.0f);
-    color.b = (int)((b + m) * 255.0f);
-
-    return color;
-}
 void update_page_hue(void) {
     char hue_msg[64];
     snprintf(hue_msg, sizeof(hue_msg), "{\"hue\":%d}", hue);
@@ -67,15 +35,15 @@ void update_page_hue(void) {
     ws_notify(hue_msg);
 }
 
-RGBColor lamp_rgbc;
-
 #define SUPER_SLEEP 25
 
 extern void wifi_init_apsta(void);
 
 void supervisor(void* params){
+    
+    memset(&tv_status, 0, sizeof tv_status);
 
-    // setup
+    // setup TODO add to status nLEDs, buffer size
     g_frame_size = (tv_config_block.resolution = TV_RESOLUTION_HIGH ? FRAME_RESOLUTION_HIGH : FRAME_RESOLUTION_LOW) * tv_config_block.bytes_per_LED;
     
 
@@ -83,26 +51,22 @@ void supervisor(void* params){
     qSuperMessage = xQueueCreate(10, sizeof(void*));
     char* msg;
 
+    tv_status.brightness = 1.0;
+    // tv_status.current_file;
+    // tv_status.file_frame_count;
+    // tv_status.file_size_bytes;
+    // tv_status.frame_number;
+    // tv_status.ip_addr;
+    tv_status.speed.tweens = 7;
+    tv_status.speed.interframe_millis = 41;
+    // tv_status.ssid;
+
     
-    memset(&tv_status, 0, sizeof tv_status);
+    ui_init(&tv_status);
 
+    // this gut will set tv_status items. prudent to pass it in as a pointer to make it obvious?
+    tv_init(&tv_status);   
 
-
-    //TODO: enable me 
-    
-
-    // for(int q = 0; q < 54; q++){
-    //     led_strip_pixels[q] = 0; // clear the led strip pixels
-    //     RGBColor c = hslToRgb(360 * q / 54.0, 90, 30);
-    //     led_strip_pixels[q*3] = c.r;
-    //     led_strip_pixels[q*3 + 1] = c.g;
-    //     led_strip_pixels[q*3 + 2] = c.b;
-
-    // }
-    // set_the_led(9,9,9);
-
-    // static int wait = 1000;
-    // static int en = 0;
 
 
     // go

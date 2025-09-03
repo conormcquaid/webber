@@ -1,8 +1,10 @@
 #ifndef __UI_STATE_H__
 #define __UI_STATE_H__
 
-#define SHORT_PRESS_DURATION 200
-#define MEDIUM_PRESS_DURATION 600
+#include "main.h"
+
+#define SHORT_PRESS_DURATION 100
+#define MEDIUM_PRESS_DURATION 300
 #define LONG_PRESS_DURATION 3000
 
 typedef enum {
@@ -58,6 +60,6 @@ void STATE_NAME ## _render(void); \
 //TODO: including a render fumction may be unnecessary
 
 //TODO: initilizes oled. owns all OLED txns
-void ui_init(void);
+void ui_init(tv_status_t* tv_status);
 
 #endif /* __UI_STATE_H__ */

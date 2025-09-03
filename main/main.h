@@ -17,18 +17,28 @@
 
 extern int g_frame_size;
 
+//TODO: amalgamte tv state, config, status into two strusts, one persistent and one ephemeral
+
+//TODO: fix references to tv_speed
+
+typedef struct{
+    uint8_t tweens; // 1-10
+    uint8_t interframe_millis; 
+}tv_speed_t;
+
 typedef struct{
 
-    char     current_file[260];
-    uint32_t file_size_bytes;
-    uint32_t file_frame_count;
-    uint32_t frame_number;
-    char     ip_addr[16];
-    char     ssid[32];
+    char      current_file[260];
+    float     brightness;
+    uint32_t  file_size_bytes;
+    uint32_t  file_frame_count;
+    uint32_t  frame_number;
+    char      ip_addr[16];
+    char      ssid[32];
+    tv_speed_t speed;;
 
 }tv_status_t;
 
-extern tv_status_t tv_status;
 
 typedef union{
     uint32_t color;
@@ -76,10 +86,7 @@ typedef enum {
     TV_MODE_OFF /* sure, why not? */
 }tv_mode_t;
 
-typedef struct{
-    uint8_t tweens; // 1-10
-    uint16_t interframe_millis; 
-}tv_speed_t;
+
 
 typedef struct{
     rotor_dir_t rotor_dir;

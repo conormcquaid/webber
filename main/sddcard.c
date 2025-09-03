@@ -63,7 +63,7 @@ void enumerate_files(void){
 }
 
 //TODO: handle errors from here
-void open_next_file(void) {
+void open_next_file(tv_status_t* pTV) {
     if(f) {
         fclose(f);
         f = NULL;
@@ -73,7 +73,7 @@ void open_next_file(void) {
         if (set_cur_file(fname)) {
             ESP_LOGI(TAG, "Opened file %s successfully", fname);
 
-            memcpy(tv_status.current_file, fname, 260); //TODO: this is already statically allocated...
+            memcpy(pTV->current_file, fname, 260); //TODO: this is already statically allocated...
 
         } else {
             ESP_LOGE(TAG, "Failed to open file %s", fname);

@@ -13,7 +13,7 @@ typedef enum{
 }tv_state_t;
 
 
-void tv_init(tv_status_t* tv_status);
+TaskHandle_t tv_init(tv_status_t* tv_status);
 void tv_play_file(const char* path);
 void tv_set_mode(tv_mode_t mode);
 void tv_set_state(tv_state_t state);

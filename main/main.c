@@ -120,7 +120,7 @@ void app_main(void)
 
 
 
-    //wifi_init_apsta();
+    wifi_init_apsta();
 
     while (1) {
         vTaskDelay(pdMS_TO_TICKS(500));

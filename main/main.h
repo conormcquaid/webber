@@ -17,7 +17,7 @@
 
 extern int g_frame_size;
 
-//TODO: amalgamte tv state, config, status into two strusts, one persistent and one ephemeral
+//TODO: amalgamte tv state, config, status into two structs, one persistent and one ephemeral
 
 //TODO: fix references to tv_speed
 

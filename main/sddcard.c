@@ -34,10 +34,11 @@ DIR* dirp;
 FILE* f = NULL;
 int file_count = 0;
 static uint32_t frame_number = 0;
+static struct stat st;
+
 
 void enumerate_files(void){
     struct dirent* dint;
-    struct stat st;
     char fname[260];
     
     while((dint = readdir(dirp)) != NULL){
@@ -73,6 +74,12 @@ void open_next_file(tv_status_t* pTV) {
         if (set_cur_file(fname)) {
             ESP_LOGI(TAG, "Opened file %s successfully", fname);
 
+            if(stat(fname, &st) == 0){
+
+                pTV->file_size_bytes = st.st_size;
+            }
+            
+            
             memcpy(pTV->current_file, fname, 260); //TODO: this is already statically allocated...
 
         } else {

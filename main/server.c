@@ -5,7 +5,6 @@
 #include "esp_wifi.h"
 #include "esp_netif.h"
 #include "lwip/inet.h"
-#include "esp_event.h"
 #include "esp_http_server.h"
 #include "dns_server.h"
 #include "freertos/semphr.h"
@@ -394,9 +393,10 @@ httpd_handle_t start_webserver( void )
         
         ESP_ERROR_CHECK(httpd_register_uri_handler(server, &ws));
         ESP_ERROR_CHECK(httpd_register_uri_handler(server, &cap_post));
-        ESP_ERROR_CHECK(httpd_register_err_handler(server, HTTPD_404_NOT_FOUND, http_404_error_handler));
+        
         ESP_ERROR_CHECK(httpd_register_uri_handler(server, &allget));
         
+        ESP_ERROR_CHECK(httpd_register_err_handler(server, HTTPD_404_NOT_FOUND, http_404_error_handler));
 
         return server;
     }

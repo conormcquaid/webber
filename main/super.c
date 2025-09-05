@@ -13,11 +13,13 @@
 #include "led_strip.h"
 #include "oled_i2c.h"
 #include "tv.h"
+#include "driver/gpio.h"
 
 static char* TAG = "super";
 int hue = 0;
 tv_status_t tv_status;
 
+// Spupervisor can receive JSON messages passed via void*
 QueueHandle_t qSuperMessage;
 
 int get_hue(void){
@@ -25,7 +27,18 @@ int get_hue(void){
 }
 
 RGBColor lamp_rgbc;
+
 extern RGBColor hslToRgb(float h, float s, float l);
+
+void send_current_file_data(void){
+
+    char payload[512]; // fname 260, 
+    snprintf(payload, sizeof payload, "{\"type\":\"NowPlaying\",\
+\"filename\":\"%s\",\
+\"nframes\":%ld,\"frame\":%ld\
+}", tv_status.current_file, tv_status.file_frame_count, tv_status.frame_number);
+    ws_notify(payload);
+}
 
 void update_page_hue(void) {
     char hue_msg[64];
@@ -51,26 +64,46 @@ void supervisor(void* params){
     qSuperMessage = xQueueCreate(10, sizeof(void*));
     char* msg;
 
+    static int one_second_accum = 0;  //TODO : counter to trigger ws update
+
+
     tv_status.brightness = 1.0;
+    tv_status.speed.tweens = 7;
+    tv_status.speed.interframe_millis = 41;
+    
     // tv_status.current_file;
     // tv_status.file_frame_count;
     // tv_status.file_size_bytes;
     // tv_status.frame_number;
     // tv_status.ip_addr;
-    tv_status.speed.tweens = 7;
-    tv_status.speed.interframe_millis = 41;
+
     // tv_status.ssid;
 
     
-    ui_init(&tv_status);
+    TaskHandle_t hUI = ui_init(&tv_status);
 
-    // this gut will set tv_status items. prudent to pass it in as a pointer to make it obvious?
-    tv_init(&tv_status);   
+    TaskHandle_t hTV = tv_init(&tv_status);   
 
-
+    // temp test
+    gpio_config_t cd_conf = {
+        .intr_type = GPIO_INTR_DISABLE,
+        .mode = GPIO_MODE_INPUT,
+        .pin_bit_mask = (1ULL << GPIO_NUM_8),
+        .pull_down_en = GPIO_PULLDOWN_DISABLE,
+        .pull_up_en = GPIO_PULLUP_ENABLE,
+    };
+    gpio_config(&cd_conf);
+    uint8_t curr_cd, prev_cd;
+    curr_cd = prev_cd = gpio_get_level(GPIO_NUM_8);
 
     // go
     while(1){
+
+        curr_cd = gpio_get_level(GPIO_NUM_8);
+        if(curr_cd != prev_cd){
+            prev_cd = curr_cd;
+            ESP_LOGI(TAG, "SDCard dtection is %d", curr_cd);
+        }
 
         while(xQueueReceive(qSuperMessage, &msg, 0)){
             ESP_LOGI(TAG, "Received super message: %s", msg);
@@ -82,27 +115,51 @@ void supervisor(void* params){
             cJSON* json = cJSON_Parse(msg);
             if(!json){
                 ESP_LOGE(TAG, "Failed to parse JSON message: %s", cJSON_GetErrorPtr());
-                continue;
+                goto json_end;
             }
             // process the json message
             cJSON* hue_item = cJSON_GetObjectItem(json, "hue");
-
-            //cJSON_HasObjectItem
 
             if(hue_item && cJSON_IsNumber(hue_item)){
                 hue = hue_item->valueint;
                 ESP_LOGI(TAG, "Setting new hue from message: %d", hue);
                 RGBColor lamp_rgbc = hslToRgb(hue, 90, 30);
                 
-                //set_the_led(rgbc.r, rgbc.g, rgbc.b);
+                //cJSON_Delete(hue_item);
             }
             cJSON* status = cJSON_GetObjectItem(json, "status");
             if(status && cJSON_IsString(status)){
                 ESP_LOGI(TAG, "Status message: %s", status->valuestring);
 
+                //TODO send dynamic page data, e.g. list of files on sd card
+                // currently playing file
+                // frame size and frame count
+                send_current_file_data();
+                //cJSON_Delete(status);
+
             }
-            cJSON_Delete(json);
-            free(msg); // free the message after processing
+            cJSON* tv_control = cJSON_GetObjectItem(json, "TVcontrol");
+            if(tv_control && cJSON_IsString(tv_control)){
+                ESP_LOGI(TAG, "TV COntrol message: %s", tv_control->valuestring);
+
+                //TODO send dynamic page data, e.g. list of files on sd card
+                // currently playing file
+                // frame size and frame count
+                cJSON_Delete(tv_control);
+
+            }
+
+json_end:
+            cJSON_Delete(json); // apparently we need to _Delete even a NULL object
+            if(msg){free(msg);}else{ESP_LOGI(TAG, "==> NULL message here <==");} // free the message after processing
+        }
+
+        one_second_accum += SUPER_SLEEP;
+        if(one_second_accum > 1000){
+            one_second_accum = 0;
+
+            //update webpage
+            send_current_file_data();
         }
 
         vTaskDelay( SUPER_SLEEP / portTICK_PERIOD_MS);

@@ -1,6 +1,7 @@
 #include "tv.h"
 #include "sdcard.h"
 #include "led_strip.h"
+#include "main.h"
 
 
 static const char* TAG = "teevee";
@@ -16,19 +17,7 @@ static uint32_t frame_count; // TODO: get this from the getting place
 extern void gamma_bright_correct(uint8_t* r, uint8_t* g, uint8_t* b, float bright);
 
 
-tv_config_block_t tv_config_block = {
-    .rotor_dir = ROTOR_DIR_CW,
-    .rotor_clicks = ROTOR_CLICKS_FOUR,
-    .resolution = TV_RESOLUTION_HIGH,
-    //.interpolation = TV_INTERPOLATE_NONE,
-    .interpolation = TV_INTERPOLATE_LINEAR_RGB,
-    .mode = TV_MODE_SEQUENTIAL,
-    .speed = {
-        .tweens = 5,
-        .interframe_millis = 41
-    },
-    .bytes_per_LED = 3 
-};
+tv_config_block_t tv_config_block;
 
 int g_frame_size;
 static int nLEDs;
@@ -66,7 +55,19 @@ led_strip_handle_t configure_led(void)
 }
 
 
-void tv_init(tv_status_t* tv_status){
+TaskHandle_t tv_init(tv_status_t* tv_status){
+
+    
+    tv_config_block.rotor_dir = ROTOR_DIR_CCW;
+    tv_config_block.rotor_clicks = ROTOR_CLICKS_TWO;
+    tv_config_block.resolution = TV_RESOLUTION_HIGH;
+  //tv_config_block.interpolation = TV_INTERPOLATE_NONE;
+    tv_config_block.interpolation = TV_INTERPOLATE_LINEAR_RGB;
+    tv_config_block.mode = TV_MODE_SEQUENTIAL;
+    tv_config_block.speed.tweens = 5;
+    tv_config_block.speed.interframe_millis = 41;
+    tv_config_block.bytes_per_LED = 3 ;
+
 
     g_frame_size = (tv_config_block.resolution == TV_RESOLUTION_HIGH ? FRAME_RESOLUTION_HIGH : FRAME_RESOLUTION_LOW) * tv_config_block.bytes_per_LED;
     nLEDs = (tv_config_block.resolution == TV_RESOLUTION_HIGH ? FRAME_RESOLUTION_HIGH : FRAME_RESOLUTION_LOW);
@@ -92,7 +93,11 @@ void tv_init(tv_status_t* tv_status){
 
     led_strip_refresh(led_strip);
 
-    xTaskCreatePinnedToCore(tv_task, "tv_task", 4096, tv_status, 5, NULL, 1);
+    TaskHandle_t hTV;
+
+    xTaskCreatePinnedToCore(tv_task, "tv_task", 4096, tv_status, configMAX_PRIORITIES-3, &hTV, 1);
+
+    return hTV;
 }
 
 
@@ -149,6 +154,36 @@ void interpolate_linear_rgb(int tween){
 
 }
 
+void tv_off(void){
+    ESP_LOGI(TAG, "TV is off");
+    // turn leds off, I suppose
+    for(int q = 0; q < nLEDs; q++){
+        led_strip_set_pixel(led_strip, q, 0, 0, 0);
+    }
+    led_strip_refresh(led_strip);
+    
+}
+void act_like_a_lamp(void){
+
+    static float n = 0.0;
+            
+    for(int q = 0; q < nLEDs; q++){
+    
+        RGBColor c = hslToRgb(n + 360.0 * (q) / nLEDs, 90, 10);
+
+        led_strip_set_pixel(led_strip, q, c.r, c.g, c.b);
+
+        n=n+0.01;
+
+    }
+    // for(int q = 0; q < nLEDs; q++){
+    //     led_strip_set_pixel(led_strip, q, lamp_rgbc.r, lamp_rgbc.g, lamp_rgbc.b);
+    // }
+    led_strip_refresh(led_strip);
+
+    vTaskDelay(pdMS_TO_TICKS(tv_config_block.speed.interframe_millis));
+}
+
 
 void tv_task(void* param){
 
@@ -159,53 +194,49 @@ void tv_task(void* param){
     renderFB = malloc(g_frame_size);
     delta    = malloc(g_frame_size);
 
-    static int one_second_accum;  //TODO : counter to trigger ws update
+
+    tv_config_block.interpolation = TV_INTERPOLATE_NONE;
 
     if(!currFB || !prevFB){
         tv_config_block.mode = TV_MODE_LAMP;
     }
 
+    // TODO: iff we have a valid sdcard attached
     tv_open_next_file(pTV);
 
     while(1){
 
-        if(tv_config_block.mode == TV_MODE_OFF){
-            for(int q = 0; q < nLEDs; q++){
-                led_strip_set_pixel(led_strip, q, 0, 0, 0);
-            }
-            led_strip_refresh(led_strip);
+        // tv message queue for prev/next file?
 
-        } else if(tv_config_block.mode == TV_MODE_LAMP){
+        // moving from one file to another should have a darkness gap. supervisor turns off, then on?
 
-            static float n = 0.0;
-            
-            for(int q = 0; q < nLEDs; q++){
-            
-                RGBColor c = hslToRgb(n + 360.0 * (q) / nLEDs, 90, 10);
+        static int one_second_accum = 0;
 
-                led_strip_set_pixel(led_strip, q, c.r, c.g, c.b);
+        switch(tv_config_block.mode){
 
-                n=n+0.01;
+            case TV_MODE_OFF:
 
-            }
-            // for(int q = 0; q < nLEDs; q++){
-            //     led_strip_set_pixel(led_strip, q, lamp_rgbc.r, lamp_rgbc.g, lamp_rgbc.b);
-            // }
-            led_strip_refresh(led_strip);
+                tv_off();
+                break;
 
-            vTaskDelay(pdMS_TO_TICKS(tv_config_block.speed.interframe_millis));
+            case TV_MODE_LAMP:
+                act_like_a_lamp();
+                break;
 
+            case TV_MODE_LIFE:
+                // not implemented yet
 
-        } else if(tv_config_block.mode == TV_MODE_LIFE){
-            // Conway's Game of Life mode
+            break;
 
-        }else{ // in actual TV mode
+            case TV_MODE_LOOP:
+            case TV_MODE_SEQUENTIAL:
+            case TV_MODE_RANDOM:
 
+            // normal playing modes
             // read a frame
             int r = getFrame(currFB);
             if(r != g_frame_size){
 
-                // focus on: main control menu and reporting system settings?
                 // config settings for new board bringup (possibly even new boards?)
                 // rgb test files for interpolation implies ability to choose playback file!
 
@@ -213,6 +244,7 @@ void tv_task(void* param){
                 // try to recover by opening next file
                 if(r == -1){ // eof
                     tv_open_next_file(pTV);
+                    
 
                 }
                 if( r == -2){
@@ -225,7 +257,10 @@ void tv_task(void* param){
                     esp_restart();
                 }
             }
+
+            pTV->file_frame_count = pTV->file_size_bytes/nLEDs;
             frame_count++;
+            pTV->frame_number = frame_count;
             // customize behavior based on interpolation mode
 
             if(tv_config_block.interpolation == TV_INTERPOLATE_NONE){
@@ -248,18 +283,23 @@ void tv_task(void* param){
 
                 for(int i = 0; i < tv_config_block.speed.tweens; i++){
                     interpolate_linear_rgb(i);
-                    vTaskDelay(pdMS_TO_TICKS(tv_config_block.speed.interframe_millis));                    
+                    //vTaskDelay(pdMS_TO_TICKS(tv_config_block.speed.interframe_millis));
                 }
             }
 
-
+            break;
+        };
             
-
-        }
-
-
+        
         // once a second or so, we should push progress notification to web and gui info block
         vTaskDelay(pdMS_TO_TICKS(tv_config_block.speed.interframe_millis));
+
+        one_second_accum += tv_config_block.speed.interframe_millis;
+        if(one_second_accum > 10*1000 ){
+            ESP_LOGI(TAG, "Speed.tweens %d, millis %d", tv_config_block.speed.tweens, tv_config_block.speed.interframe_millis);
+            ESP_LOGI(TAG,"Elapsed millis: %lld", esp_timer_get_time()/1000);
+            one_second_accum = 0;
+        }
     }
 
 }
@@ -270,9 +310,10 @@ void tv_set_state(tv_state_t state);
 tv_mode_t tv_get_mode(void);
 
 void tv_set_speed(tv_status_t* tv_status, tv_speed_t speed){
-    tv_status->speed = speed;
+    tv_config_block.speed.tweens = speed.tweens;
+    tv_config_block.speed.interframe_millis = speed.interframe_millis;
 }
 tv_speed_t tv_get_speed(tv_status_t* tv_status){
-    return tv_status->speed;
+    return tv_config_block.speed;
 }
 tv_state_t tv_get_state(void);

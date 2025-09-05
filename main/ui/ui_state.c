@@ -9,10 +9,11 @@
 #include "oled_i2c.h"
 #include "rotary_encoder.h"
 #include "stdbool.h"
-#include "proj.h"
+//#include "proj.h"
 #include "main.h"
 #include "tv.h"
 #include "ui/icons2.h"
+#include "ui/projector.h"
 
 static const char* TAG = "ui_";
 
@@ -57,11 +58,13 @@ void button_install(void){
 
 #define UI_DELAY 10
 
-void ui_init(tv_status_t* tv_status){
+TaskHandle_t ui_init(tv_status_t* tv_status){
 
     //spawn ui task
     TaskHandle_t hUI_task;
     xTaskCreatePinnedToCore(ui_task, "ui_task", 20*1024, tv_status, configMAX_PRIORITIES-2, &hUI_task, 1);
+
+    return hUI_task;
 }
 
 void set_next_state(ui_state_t* next_state){
@@ -564,7 +567,7 @@ void play_icon_event_handler(ui_event_t event){
 
         pi_choices = (pi_choices + 1) % nchoices;
 
-    }else if(event.type == UI_SHORT_PRESS || event.type == UI_MEDIUM_PRESS){
+    }else if(event.type == UI_SHORT_PRESS){
 
         switch(pi_choices){
             case PREV:
@@ -578,8 +581,15 @@ void play_icon_event_handler(ui_event_t event){
             ESP_LOGI(TAG, "TV is %s", (playing ? "playing" : "paused") );
         }
 
+    }
+    else if(event.type == UI_MEDIUM_PRESS){
+        set_next_state(&idle_state);
+        return;
+
     }else if(event.type == UI_LONG_PRESS){
         //TODO: system mode??
+
+        return;
     }
     
     play_icon_render();    
@@ -594,11 +604,17 @@ void play_icon_tick(int milliseconds){
 void play_icon_render(void){
 
     // w = 128. (32 * 3) = 96. 128 - 96 = 32. 32 /4 = 8
-    // [8][32][8][32][8]32][8]
+    // [8] [32] [8] [32] [8] [32] [8]
     OLED_fill2(8,   8 + 31, 2, 6, prev_small_png, (pi_choices != PREV) );
     OLED_fill2(48, 48 + 31, 2, 6, (playing ? play_small_png : pause_small_png), (pi_choices != PLAY_PAUSE) );
     OLED_fill2(88, 88 + 31, 2, 6, next_small_png, (pi_choices != NEXT) );
 }
+
+
+
+/// TODO add menus for playback mode seq/loop/rand
+
+// add menu for tv mode : lamp, life, tv, ??
 
         // uint8_t play_small_png[128] 
         // /* Image: next_small.png, width 32, height 32 */

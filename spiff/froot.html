@@ -101,11 +101,11 @@
             </tr>
             <tr>
 
-              <td><span class="large-char" alt="previous movie" data-tooltip="previous" data-placement="left">⏮</span></td>
+              <td><span class="large-char" alt="previous movie">⏮</span></td>
               <td><span class="large-char" alt="speed">
                 <canvas id="speedDial" width="200" height="200" ></canvas>
               </span></td>
-              <td><span class="large-char" alt="next movie" data-tooltip="next" data-placement="right">⏭</span></td>
+              <td><span class="large-char" alt="next movie" >⏭</span></td>
             </tr>
             <tr>
               <td>&nbsp;</td>
@@ -120,11 +120,17 @@
       <canvas id="hueCanvas" width="200" height="200" ></canvas>
       
       <div class="container">
+        <section>
       <p>Now playing:</p>
-        <select id="dynamicSelect">
-            <!-- Options will be populated by WebSocket -->
+        <select id="CurrentFile">
+            <!-- Options will be populated by WebSocket TODO: probably just want a nice text box here-->
             <option value="">Loading ...</option>
         </select>
+        <div class="slider-container">
+            <input type="range" id="progressSlider" min="0" max="360" value="180" readonly>
+            Total Frames:&nbsp;<span id="sliderValueDisplay">0</span>
+        </div>
+        </section>
 
         <p>Send a message:</p>
         <button id="button1">Send Message 1</button>
@@ -147,8 +153,6 @@
 
 <!-- END OF HTML -->
 
-
-
     <script>
       const wsStatus = document.getElementById('wsStatus');
       const hc = document.getElementById('hueCanvas');
@@ -166,6 +170,17 @@
                 if (message.type === 'select_options') {
 
                     populateSelect(message.options);
+
+                }else if(message.type == 'NowPlaying'){
+
+                  var cf = document.getElementById('CurrentFile'); 
+                  var cp = document.getElementById('progressSlider');
+                  cf.value = message.filename;
+                  cp.max   = message.nFrames; 
+                  cp.value = message.frame;
+
+
+
                 } else if (message.type === 'status_update') {
 
                     console.log('Status from ESP32:', message.text);
@@ -197,7 +212,7 @@
 
       button1.onclick = () => {
           if (ws.readyState === WebSocket.OPEN) {
-              ws.send(JSON.stringify({ type: 'button_click', id: 'button1' }));
+              ws.send(JSON.stringify({ 'TVcontrol':'prev' }));
               console.log('Sent button1 click');
           } else {
               console.warn('WebSocket not open for button1 click');

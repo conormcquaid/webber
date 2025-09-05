@@ -40,11 +40,9 @@ int connectionStatus = 0;
 
 static char* TAG = "Wifi_Man";
 
-esp_err_t init_wifi_creds_nvs(void);
-esp_err_t deinit_wifi_creds(void);
-esp_err_t load_wifi_creds(void);
 
 WifiCred* pCredentials;
+uint8_t   nCredentials;
 
 extern void websocket_task(void* nada);
 
@@ -134,6 +132,9 @@ static void wifi_event_handler(void *arg, esp_event_base_t event_base,
     } else if (event_base == IP_EVENT && event_id == IP_EVENT_STA_GOT_IP) {
         ip_event_got_ip_t *event = (ip_event_got_ip_t *) event_data;
         ESP_LOGI(TAG_STA, "===================Got IP:" IPSTR, IP2STR(&event->ip_info.ip));
+
+// TODO: make IP available
+
         s_retry_num = 0;
         xEventGroupSetBits(s_wifi_event_group, WIFI_CONNECTED_BIT);
     }
@@ -275,7 +276,9 @@ void wifi_init_apsta(void){
     if (bits & WIFI_CONNECTED_BIT) {
         ESP_LOGI(TAG_STA, "connected to ap SSID:%s password:%s",
                  EXAMPLE_ESP_WIFI_STA_SSID, EXAMPLE_ESP_WIFI_STA_PASSWD);
-////////////////////////////////////////////////        softap_set_dns_addr(esp_netif_ap,esp_netif_sta);
+////////////////////////////////////////////////        
+softap_set_dns_addr(esp_netif_ap,esp_netif_sta);
+
     } else if (bits & WIFI_FAIL_BIT) {
         ESP_LOGI(TAG_STA, "Failed to connect to SSID:%s, password:%s",
                  EXAMPLE_ESP_WIFI_STA_SSID, EXAMPLE_ESP_WIFI_STA_PASSWD);
@@ -291,6 +294,14 @@ void wifi_init_apsta(void){
     // if (esp_netif_napt_enable(esp_netif_ap) != ESP_OK) {
     //     ESP_LOGE(TAG_STA, "NAPT not enabled on the netif: %p", esp_netif_ap);
     // }
+
+    ESP_ERROR_CHECK(load_wifi_creds());
+    ESP_ERROR_CHECK(get_credentials(&pCredentials, &nCredentials));
+
+    for(int i = 0; i< nCredentials; i++){
+
+        ESP_LOGI(TAG, "Loaded credential for SSID %32s", pCredentials[i].ssid);
+    }
 
     init_webserver();
     start_mdns_service();

@@ -23,7 +23,7 @@ typedef struct{
 //     WifiCred *wifiCreds; // pointer to array of WifiCred[nCreds]
 // }WiFiCredBlob;
 
-void test_credentials(void);
+void      test_credentials(void);
 esp_err_t init_wifi_creds_nvs(void);
 esp_err_t deinit_wifi_creds(void);
 esp_err_t load_wifi_creds(void);

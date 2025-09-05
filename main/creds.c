@@ -108,9 +108,14 @@ esp_err_t load_wifi_creds(void){
 
         //get blob
         e = nvs_get_blob(nvhandle, WIFI_CRED_KEY, pCredentials, &sz);
-        if(verbose) ESP_LOGI(TAG, "Loading wifi creds, size %d", sz);
+        ESP_LOGV(TAG, "Loading wifi creds, size %d", sz);
+        
     
         nCredentials  = sz / sizeof(WifiCred);
+
+        if(sz % sizeof(WifiCred) != 0){
+            ESP_LOGE(TAG, "Credentials format error");
+        }
         assert(nCredentials < MAX_CREDENTIALS);
 
 
@@ -120,6 +125,7 @@ esp_err_t load_wifi_creds(void){
 
         pCredentials = NULL;
         nCredentials = 0;
+        ESP_LOGI(TAG, "Creating default empty wifi cred array");
         
     } 
 

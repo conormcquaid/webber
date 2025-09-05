@@ -27,7 +27,7 @@ typedef struct{
     void (*tick)(int millis);
     void (*render)(void);
 } ui_state_t;
-
+                    
 #define ROTOR_PUSH_BUTTON   GPIO_NUM_36
 
 //extern ui_state_t idle_state, system_state, splash_state, menu_state, about_state, settings_state, update_state, file_browser_state;
@@ -60,6 +60,6 @@ void STATE_NAME ## _render(void); \
 //TODO: including a render fumction may be unnecessary
 
 //TODO: initilizes oled. owns all OLED txns
-void ui_init(tv_status_t* tv_status);
+TaskHandle_t ui_init(tv_status_t* tv_status);
 
 #endif /* __UI_STATE_H__ */

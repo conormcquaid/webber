@@ -13,11 +13,12 @@
 #include "led_strip.h"
 #include "oled_i2c.h"
 #include "tv.h"
+#include "creds.h"
 #include "driver/gpio.h"
 
 static char* TAG = "super";
 int hue = 0;
-tv_status_t tv_status;
+tv_runtime_status_t tv_status;
 
 // Spupervisor can receive JSON messages passed via void*
 QueueHandle_t qSuperMessage;
@@ -51,13 +52,14 @@ void update_page_hue(void) {
 #define SUPER_SLEEP 25
 
 extern void wifi_init_apsta(void);
+extern tv_preferences_t     tv_prefs;
 
 void supervisor(void* params){
     
     memset(&tv_status, 0, sizeof tv_status);
 
     // setup TODO add to status nLEDs, buffer size
-    g_frame_size = (tv_config_block.resolution = TV_RESOLUTION_HIGH ? FRAME_RESOLUTION_HIGH : FRAME_RESOLUTION_LOW) * tv_config_block.bytes_per_LED;
+    g_frame_size = (tv_hw_config.resolution = TV_RESOLUTION_HIGH ? FRAME_RESOLUTION_HIGH : FRAME_RESOLUTION_LOW) * tv_hw_config.bytes_per_LED;
     
 
     const int hue_increment = 45;
@@ -67,19 +69,10 @@ void supervisor(void* params){
     static int one_second_accum = 0;  //TODO : counter to trigger ws update
 
 
-    tv_status.brightness = 1.0;
-    tv_status.speed.tweens = 7;
-    tv_status.speed.interframe_millis = 41;
-    
-    // tv_status.current_file;
-    // tv_status.file_frame_count;
-    // tv_status.file_size_bytes;
-    // tv_status.frame_number;
-    // tv_status.ip_addr;
+    ESP_ERROR_CHECK( load_hw_config(&tv_hw_config));
+    ESP_ERROR_CHECK( load_tv_preferences(&tv_prefs));
 
-    // tv_status.ssid;
 
-    
     TaskHandle_t hUI = ui_init(&tv_status);
 
     TaskHandle_t hTV = tv_init(&tv_status);   
@@ -145,7 +138,7 @@ void supervisor(void* params){
                 //TODO send dynamic page data, e.g. list of files on sd card
                 // currently playing file
                 // frame size and frame count
-                cJSON_Delete(tv_control);
+                //cJSON_Delete(tv_control);
 
             }
 

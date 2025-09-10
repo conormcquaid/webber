@@ -9,11 +9,12 @@
 #include "oled_i2c.h"
 #include "rotary_encoder.h"
 #include "stdbool.h"
-//#include "proj.h"
+#include "dial.h"
 #include "main.h"
 #include "tv.h"
 #include "ui/icons2.h"
 #include "ui/projector.h"
+#include "creds.h"
 
 static const char* TAG = "ui_";
 
@@ -36,11 +37,13 @@ PROTOYPE_STATE(projector);
 PROTOYPE_STATE(brightness);
 PROTOYPE_STATE(tweens);
 PROTOYPE_STATE(play_icon);
+PROTOYPE_STATE(dial);
+PROTOYPE_STATE(mode);
 
 
 ui_state_t* current_ui_state;
 void ui_task(void* params);
-static tv_status_t* pTV;
+static tv_runtime_status_t* pTV;
 
 void button_install(void){
         // set up IO36 as the switch input
@@ -58,11 +61,11 @@ void button_install(void){
 
 #define UI_DELAY 10
 
-TaskHandle_t ui_init(tv_status_t* tv_status){
+TaskHandle_t ui_init(tv_runtime_status_t* pTV_status){
 
     //spawn ui task
     TaskHandle_t hUI_task;
-    xTaskCreatePinnedToCore(ui_task, "ui_task", 20*1024, tv_status, configMAX_PRIORITIES-2, &hUI_task, 1);
+    xTaskCreatePinnedToCore(ui_task, "ui_task", 20*1024, pTV_status, configMAX_PRIORITIES-2, &hUI_task, 1);
 
     return hUI_task;
 }
@@ -81,7 +84,7 @@ void set_next_state(ui_state_t* next_state){
 
 void ui_task(void* params){
 
-    pTV = (tv_status_t*) params;
+    pTV = (tv_runtime_status_t*) params;
 
     current_ui_state = &splash_state;
 
@@ -125,8 +128,8 @@ void ui_task(void* params){
         } else {
             // button released
             if(held_ms > LONG_PRESS_DURATION){
-                // long press, go to system menu
-                set_next_state(&settings_state);
+                evt.type = UI_LONG_PRESS;
+                ESP_LOGI(TAG, "Long");
 
             } else if(held_ms >= MEDIUM_PRESS_DURATION){
 
@@ -190,12 +193,12 @@ void splash_tick(int milliseconds){
 
 /////////////////////////////////////////////////////////////////////////////
 static int projector_millis;
-static int projector_frame;
+static int projector_frame = 0;
 #define PROJECTOR_FRAMES (21)
 #define PROJ_MS_DELAY (120)
 
 void projector_init(void){
-    OLED_Clear(0,7);
+    OLED_fill(0, 7, NULL, true);
 };
 void projector_event_handler(ui_event_t event){};
 
@@ -219,7 +222,7 @@ void projector_render(void){
 /////////////////////////////////////////////////////////////////////////////
 static int idle_idx = 0;
 static int idle_ms = 0;
-static bool invert_idle = true;
+static bool invert_idle = false;
 static bool asleep = false;
 #define IDLE_FRAME_DURATION (120)
 #define IDLE_NUM_FRAMES (24)
@@ -228,11 +231,11 @@ void idle_init(void){
 
     OLED_fill(0, 7, NULL, 0); 
     idle_render();
-
+    idle_ms = 0;
+    asleep = false;
 };
-void idle_tick(int milliseconds){
 
-    if(asleep) return;
+void idle_tick(int milliseconds){
 
     idle_ms += milliseconds;
     if(idle_ms > IDLE_TIMEOUT){
@@ -244,46 +247,44 @@ void idle_tick(int milliseconds){
 };
 void idle_render(void){ 
 
-    OLED_fill(0, 7, (uint8_t*)hi_rez_3cog[idle_idx], invert_idle);
+    OLED_WriteSmall("Now Playing:", 0, 0, invert_idle);
+    OLED_WriteBig(&pTV->current_file[0], 2, 0, invert_idle);
+
+    uint8_t pct = (100.0 * pTV->frame_number) / pTV->file_frame_count ;
 
     char buf[8];
-    sprintf(buf, "%02d", idle_idx);
-    OLED_WriteBig( buf, 0, 100, !invert_idle);
+    snprintf(buf, 8, "% 3d%%", pct);
+    OLED_WriteBig( buf, 5, 1, false);
 }
 void idle_event_handler(ui_event_t evt){
 
     idle_ms = 0;
 
-    ESP_LOGI(TAG, "Idle event: %d", evt.type);
-    if (evt.type == UI_ROTOR_DEC){
-
-        idle_idx = (idle_idx - 1 + IDLE_NUM_FRAMES) % IDLE_NUM_FRAMES;
+    switch(evt.type){
         
-    }else if (evt.type == UI_ROTOR_INC){
-
-        idle_idx = (idle_idx + 1) % IDLE_NUM_FRAMES;
-
-    }else if(evt.type == UI_SHORT_PRESS){
-
+        case UI_ROTOR_INC:
+        case UI_ROTOR_DEC:
+        case UI_SHORT_PRESS:
         if(asleep){
             asleep = false;
         }else{
-            set_next_state(&brightness_state);
+            set_next_state(&tweens_state);
             return;
         }
-    }else if(evt.type == UI_MEDIUM_PRESS){
-
-        if(asleep){
-            asleep = false;
-        }else{
-            set_next_state(&brightness_state);
+            break;
+        case UI_MEDIUM_PRESS:
+            set_next_state(&tweens_state);
             return;
-        }
-    }else if(evt.type == UI_LONG_PRESS){
-        
+            break;
+        case UI_LONG_PRESS:
         set_next_state(&settings_state);
-        return;
+            return;
+            break;
+        default:
+            break;
     }
+
+    
     idle_render();
 }
 /////////////////////////////////////////////////////////////////////////////
@@ -303,6 +304,7 @@ bool selecting = false;
 enum{NONE, TWEEN, FPS, THING3, THING4};
 
 void menu_init(void){
+
     OLED_Clear(0,7);
     
     menu_sel = 0;
@@ -337,11 +339,15 @@ void menu_event_handler(ui_event_t event){
 };
 void menu_tick(int milliseconds){
     menu_millis += milliseconds;
+    if(menu_millis > MENU_TIMEOUT){
+        set_next_state(&idle_state);
+        return;
+    }   
 };
 void menu_render(void){    /////////////////////////////TODO: what if there is no memory card!!
 
     sprintf(title_str, "%.20s %02d", &pTV->current_file[0], (int)(100.0 * pTV->frame_number / pTV->file_frame_count));
-    sprintf(tween_str, "tweens %02d", tv_config_block.speed.tweens);
+    sprintf(tween_str, "tweens %02d", 1234);
 
     OLED_WriteSmall(title_str, 0, 0, (menu_sel == 1));
     OLED_WriteSmall(tween_str, 2, 0, (menu_sel == 2));
@@ -359,37 +365,71 @@ void about_tick(int milliseconds){};
 void about_render(void){};
 
 //////////////////////////////////////////////////////////////////////////////////
+// FACTORY MENU
+// [0] exit
+// [1] configure hardware
+// [2] factory reset
+
+
+
+
 // set the config parameters for tv
+// rotor chooses which option is highlighted, short press changes value
+// all options are bi-valent
+
 #define CONFIG_IDLE_TIMEOUT (15 * 1000 )
 static int config_millis = 0;
-char* config_items[] = {
-    "Resolution",
-    "Speed",
-    "Bytes/LED",
-    "Rotor Dir",
-    "Rotor Clicks"
+enum{EDITING, SAVING}editSaveMode = EDITING;
 
+char* config_items[] = {
+    "nLEDs", 
+    "LED[]",
+    "Dir",
+    "Count"
 };
 int nItems = sizeof(config_items)/sizeof(config_items[0]);
 int selected_line = 0;
-typedef enum{ SELECTING, EDITING} config_mode_t;
-config_mode_t config_mode = SELECTING;
+
 
 void settings_init(void){
     OLED_Clear(0,7);
     settings_render();
+    config_millis = 0;
+    editSaveMode = EDITING;
+    selected_line = 0;
 
 }
 void settings_event_handler(ui_event_t event){
-    if(event.type == UI_ROTOR_DEC){
-        selected_line = (selected_line + nItems - 1) % nItems;
-        if(selected_line < 0) selected_line = 0;
-    }else if(event.type == UI_ROTOR_INC){
-        selected_line = (selected_line + 1) % nItems;
-    }else if(event.type == UI_LONG_PRESS){
-        set_next_state(&menu_state);
-        return;
-    }
+
+    switch(event.type){
+        case UI_SHORT_PRESS:
+            switch(selected_line){
+                case 0:
+                    tv_hw_config.resolution = (tv_hw_config.resolution == TV_RESOLUTION_HIGH) ? TV_RESOLUTION_LOW : TV_RESOLUTION_HIGH;
+                    break;
+                case 1:
+                    tv_hw_config.bytes_per_LED = (tv_hw_config.bytes_per_LED == 3) ? 4 : 3;
+                    break;
+                case 2:
+                    tv_hw_config.rotor_dir = (tv_hw_config.rotor_dir == ROTOR_DIR_CW) ? ROTOR_DIR_CCW : ROTOR_DIR_CW;
+                    break;
+                case 3:
+                    tv_hw_config.rotor_clicks = (tv_hw_config.rotor_clicks == ROTOR_CLICKS_TWO) ? ROTOR_CLICKS_FOUR : ROTOR_CLICKS_TWO;
+                    break;
+            }
+            break;
+        case UI_MEDIUM_PRESS:
+            selected_line = 0;
+            editSaveMode = SAVING;
+            break;
+        case UI_LONG_PRESS:
+            set_next_state(&menu_state);
+            return;
+            break;
+        default:
+            break;
+    }   
+
     settings_render();
     config_millis = 0;
 }
@@ -403,10 +443,19 @@ void settings_tick(int milliseconds){
 void settings_render(void){
 
     OLED_Clear(0,7);
-    OLED_WriteBig("Settings", 0, 3, false);
-    for(int i = 0; i < nItems; i++){
-        OLED_WriteBig(config_items[i], 2 + i*2, 0, (i == selected_line));
+    if(editSaveMode == SAVING){
+        OLED_WriteBig("Saving...", 3, 3, false);
+        save_hw_config(&tv_hw_config);
+        ESP_LOGI(TAG, "Saving config to NVS");
+        vTaskDelay(500 / portTICK_PERIOD_MS);
+        set_next_state(&idle_state);
+        return;
     }
+
+    OLED_WriteBig("nLEDs %d", tv_hw_config.resolution == TV_RESOLUTION_HIGH ? FRAME_RESOLUTION_HIGH : FRAME_RESOLUTION_LOW, 0, (selected_line == 0 ));
+    OLED_WriteBig("LED[%d]",  tv_hw_config.bytes_per_LED == 3 ? 3 : 4,                                                      2, (selected_line == 1 ));
+    OLED_WriteBig("Dir %cCW", tv_hw_config.rotor_dir == ROTOR_DIR_CW ? ' ' : 'C',                                        4, (selected_line == 2 ));
+    OLED_WriteBig("Clicks %d",tv_hw_config.rotor_clicks == ROTOR_CLICKS_TWO ? 2 : 4,                                        6, (selected_line == 3 ));
 }
 //////////////////////////////////////////////////////////////////////////////////
 
@@ -440,10 +489,14 @@ void error_render(void){
 };
 
 /////////////////////////////////////////////////////////////////////////////
-static float brightness = 1.0;
+#include "bright.h"
+static float brightness;
 static float bright_increment = 0.01;
 
 void brightness_init(void){
+
+    brightness = tv_get_brightness();
+    
     OLED_Clear(0,7);
     menu_timeout = 0;
     brightness_render();
@@ -462,12 +515,13 @@ void brightness_event_handler(ui_event_t event){
 
     }else if(event.type == UI_SHORT_PRESS || event.type == UI_MEDIUM_PRESS){
 
-        set_next_state(&tweens_state);
+        set_next_state(&play_icon_state);
         return;
     }else if(event.type == UI_LONG_PRESS){
-        //TODO: system mode??
+        set_next_state(&settings_state);
+        return;
     }
-    pTV->brightness = brightness;
+    tv_set_brightness(brightness);;
     brightness_render();
 };
 void brightness_tick(int milliseconds){
@@ -477,76 +531,95 @@ void brightness_tick(int milliseconds){
     }
 };
 void brightness_render(void){
-    OLED_WriteBig("Brightness", 1, 1, 0);
+
+   // OLED_Clear(0,7);
+   // OLED_fill(4,7,NULL, false);
+
+    OLED_fill2(0, 127, 0, 3, bright_bg, true);
+
+    int bar_width = (int)(brightness * 127.0);
+
+
+    OLED_fill2(0, 127, 4, 7, bright_lvl, true);
+// obscure RHS of bar
+    OLED_fill2(bar_width, 127, 4, 7, NULL, false);
+
+
+
     char b[6];
     snprintf(b, 6, "%3.0f%%", brightness * 100);
-    OLED_WriteBig(b, 4, 4, 0);
+    OLED_WriteSmall(b, 0, 12, 0);
+
+
+
+    snprintf(b, 6, "%d", bar_width);
+    OLED_WriteSmall(b, 0, 0, 0);
 };
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-tv_speed_t tv_speed;
-enum{TWEENS, MILLIS}edit_state;
+// tv_speed_t tv_speed;
+// enum{TWEENS, MILLIS}edit_state;
 
-void tweens_init(void){
+// void tweens_init(void){
 
-    OLED_Clear(0,7);
-    menu_timeout = 0;
-    tv_speed = tv_get_speed(pTV);
-    edit_state = TWEEN;
-    tweens_render();
-};
-void tweens_event_handler(ui_event_t event){
+//     OLED_Clear(0,7);
+//     menu_timeout = 0;
+//     tv_speed = tv_get_speed();
+//     edit_state = TWEEN;
+//     tweens_render();
+// };
+// void tweens_event_handler(ui_event_t event){
 
-    menu_timeout = 0;
-    uint8_t item;
-    item = (edit_state == TWEENS) ? tv_speed.tweens : tv_speed.interframe_millis; 
+//     menu_timeout = 0;
+//     uint8_t item;
+//     item = (edit_state == TWEENS) ? tv_speed.tweens : tv_speed.interframe_millis; 
     
-    if(event.type == UI_ROTOR_DEC){
-        item = item - 1;
-        item = MAX(1, item);
-    }else if(event.type == UI_ROTOR_INC){
-        item = item + 1;
-        item = MIN(99, item);
+//     if(event.type == UI_ROTOR_DEC){
+//         item = item - 1;
+//         item = MAX(1, item);
+//     }else if(event.type == UI_ROTOR_INC){
+//         item = item + 1;
+//         item = MIN(99, item);
 
-    }else if(event.type == UI_SHORT_PRESS ){
+//     }else if(event.type == UI_SHORT_PRESS ){
 
-        edit_state = 1 - edit_state;
-        item = (edit_state == TWEENS) ? tv_speed.tweens : tv_speed.interframe_millis;
+//         edit_state = 1 - edit_state;
+//         item = (edit_state == TWEENS) ? tv_speed.tweens : tv_speed.interframe_millis;
 
-    }
-    else if(event.type == UI_MEDIUM_PRESS){
-        set_next_state(&play_icon_state);
-        return;
+//     }
+//     else if(event.type == UI_MEDIUM_PRESS){
+//         set_next_state(&play_icon_state);
+//         return;
 
-    }else if(event.type == UI_LONG_PRESS){
-        //TODO: system mode??
-    }
+//     }else if(event.type == UI_LONG_PRESS){
+//         //TODO: system mode??
+//     }
 
-    if(edit_state == TWEENS){ tv_speed.tweens = item; } else {tv_speed.interframe_millis = item;}
+//     if(edit_state == TWEENS){ tv_speed.tweens = item; } else {tv_speed.interframe_millis = item;}
 
-    tv_set_speed(pTV, tv_speed);
-    tweens_render();
-};
-void tweens_tick(int milliseconds){
-    menu_timeout += milliseconds;
-    if(menu_timeout > MENU_TIMEOUT){
-        set_next_state(&idle_state);
-    }
-};
-void tweens_render(void){
+//     tv_set_speed(tv_speed);
+//     tweens_render();
+// };
+// void tweens_tick(int milliseconds){
+//     menu_timeout += milliseconds;
+//     if(menu_timeout > MENU_TIMEOUT){
+//         set_next_state(&idle_state);
+//     }
+// };
+// void tweens_render(void){
 
-    OLED_WriteSmall("tweens", 1, 0, 0);
-    OLED_WriteSmall("millis", 1, 15, 0);
-    char b[4];
-    snprintf(b, 4, "%2d", tv_speed.tweens);
-    OLED_WriteBig(b, 4, 1, (edit_state == TWEENS));
-    snprintf(b, 4, "%2d", tv_speed.interframe_millis);
-    OLED_WriteBig(b, 4, 8, (edit_state == MILLIS));
-};
+//     OLED_WriteSmall("tweens", 1, 0, 0);
+//     OLED_WriteSmall("millis", 1, 15, 0);
+//     char b[4];
+//     snprintf(b, 4, "%2d", tv_speed.tweens);
+//     OLED_WriteBig(b, 4, 1, (edit_state == TWEENS));
+//     snprintf(b, 4, "%2d", tv_speed.interframe_millis);
+//     OLED_WriteBig(b, 4, 8, (edit_state == MILLIS));
+// };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-static enum{PREV, PLAY_PAUSE, NEXT}pi_choices;
+static enum{PREV, NONE, NEXT}pi_choices;
 static uint8_t nchoices = 3;
 
 static bool playing = true;
@@ -554,16 +627,81 @@ static bool playing = true;
 void play_icon_init(void){
     OLED_Clear(0,7);
     menu_timeout = 0;
-    pi_choices = PLAY_PAUSE;
+    pi_choices = NONE;
     play_icon_render();
 }
 
 void play_icon_event_handler(ui_event_t event){
     menu_timeout = 0;
 
-    if(event.type == UI_ROTOR_DEC){
+    if(event.type == UI_ROTOR_INC){
         pi_choices = (pi_choices + nchoices - 1) % nchoices;
-    }else if(event.type == UI_ROTOR_INC){
+    }else if(event.type == UI_ROTOR_DEC){
+
+        pi_choices = (pi_choices + 1) % nchoices;
+
+    }else if(event.type == UI_SHORT_PRESS){
+
+        switch(pi_choices){
+            case PREV:
+            ESP_LOGI(TAG, "Go to previous file");
+            break;
+            case NEXT:
+            ESP_LOGI(TAG, "Go to next file");
+            break;
+
+        }
+
+    }
+    else if(event.type == UI_MEDIUM_PRESS){
+        set_next_state(&idle_state);
+        return;
+
+    }else if(event.type == UI_LONG_PRESS){
+
+        set_next_state(&settings_state);
+        return;
+
+    }
+    
+    play_icon_render();    
+}
+
+void play_icon_tick(int milliseconds){
+        menu_timeout += milliseconds;
+    if(menu_timeout > MENU_TIMEOUT){
+        set_next_state(&idle_state);
+    }
+}
+void play_icon_render(void){
+
+    // w = 128. (32 * 3) = 96. 128 - 96 = 32. 32 /4 = 8
+    // [8] [32] [8] [32] [8] [32] [8]
+    OLED_fill2(8,   8 + 31, 2, 6, prev_small_png, (pi_choices != PREV) );
+    //OLED_fill2(48, 48 + 31, 2, 6, (playing ? play_small_png : pause_small_png), (pi_choices != PLAY_PAUSE) );
+    OLED_fill2(88, 88 + 31, 2, 6, next_small_png, (pi_choices != NEXT) );
+}
+
+
+/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+static enum{SEQ, RAND, LOOP}loopmode_choices;
+static uint8_t nchoices = 3;
+
+static bool playing = true;
+
+void mode_icon_init(void){
+    OLED_Clear(0,7);
+    menu_timeout = 0;
+    tv_mode_t tv_mode = tv_get_mode()
+    play_icon_render();
+}
+
+void mode_icon_event_handler(ui_event_t event){
+    menu_timeout = 0;
+
+    if(event.type == UI_ROTOR_INC){
+        pi_choices = (pi_choices + nchoices - 1) % nchoices;
+    }else if(event.type == UI_ROTOR_DEC){
 
         pi_choices = (pi_choices + 1) % nchoices;
 
@@ -583,25 +721,26 @@ void play_icon_event_handler(ui_event_t event){
 
     }
     else if(event.type == UI_MEDIUM_PRESS){
-        set_next_state(&idle_state);
+        set_next_state(&dial_state);
         return;
 
     }else if(event.type == UI_LONG_PRESS){
-        //TODO: system mode??
 
+        set_next_state(&settings_state);
         return;
+
     }
     
-    play_icon_render();    
+    mode_icon_render();    
 }
 
-void play_icon_tick(int milliseconds){
+void mode_icon_tick(int milliseconds){
         menu_timeout += milliseconds;
     if(menu_timeout > MENU_TIMEOUT){
         set_next_state(&idle_state);
     }
 }
-void play_icon_render(void){
+void mode_icon_render(void){
 
     // w = 128. (32 * 3) = 96. 128 - 96 = 32. 32 /4 = 8
     // [8] [32] [8] [32] [8] [32] [8]
@@ -629,3 +768,128 @@ void play_icon_render(void){
         // uint8_t rand_png[128] 
         // /* Image: seq.png, width 32, height 32 */
         // uint8_t seq_png[128] 
+
+///////////////////////////////////////////////////////////////////////////////////////////////////////
+static int tween_idx = 0;
+static bool invert_tween  = false;
+#define TWEEN_NUM_FRAMES (25)
+
+void tweens_init(void){
+
+    OLED_Clear(0,7);
+    menu_timeout = 0;
+    tv_speed_t speed = tv_get_speed();
+    tween_idx = speed.tweens % TWEEN_NUM_FRAMES;
+    tweens_render();
+};
+
+void tweens_tick(int milliseconds){
+
+    menu_timeout += milliseconds;
+    if(menu_timeout > MENU_TIMEOUT){
+        set_next_state(&dial_state);
+    }    
+     
+};
+void tweens_render(void){ 
+
+    OLED_fill(0, 7, (uint8_t*)hi_rez_3cog[tween_idx], invert_tween);
+
+    tv_speed_t speed = tv_get_speed();
+
+    char buf[8];
+    snprintf(buf, 8, "% d", speed.tweens);
+    OLED_WriteBig( buf, 0, 9, !invert_tween);
+}
+void tweens_event_handler(ui_event_t evt){
+
+    tv_speed_t speed = tv_get_speed();
+
+    switch(evt.type){
+        case UI_ROTOR_DEC:
+            tween_idx = (tween_idx - 1 + TWEEN_NUM_FRAMES) % TWEEN_NUM_FRAMES;
+            speed.tweens -= 1;
+            speed.tweens = MIN(99, speed.tweens);
+            tv_set_speed(speed);
+        break;
+        case UI_ROTOR_INC:
+            tween_idx = (tween_idx + 1) % TWEEN_NUM_FRAMES;
+            speed.tweens += 1;
+            speed.tweens = MAX(1, speed.tweens);
+            tv_set_speed(speed);
+        break;
+        case UI_SHORT_PRESS:
+        case UI_MEDIUM_PRESS:
+            set_next_state(&dial_state);
+            return;
+        break;
+        case UI_LONG_PRESS:
+            set_next_state(&settings_state);
+            return;
+        break;
+        default:
+            return;
+    }   
+    tweens_render();
+}
+/////////////////////////////////////////////////////////////////////////////
+static int dial_idx = 0;
+static bool invert_dial = true;
+#define DIAL_NUM_FRAMES (20)
+
+void dial_init(void){
+
+    OLED_Clear(0,7);
+    menu_timeout = 0;
+    dial_render();
+};
+void dial_tick(int milliseconds){
+
+    menu_timeout += milliseconds;
+    if(menu_timeout > MENU_TIMEOUT){
+        set_next_state(&idle_state);
+    }    
+     
+};
+void dial_render(void){ 
+
+    OLED_fill(0, 7, (uint8_t*)dial[dial_idx], invert_dial);
+    tv_speed_t speed = tv_get_speed();
+
+    char buf[8];
+    snprintf(buf, 8, "% d", speed.interframe_millis);
+    OLED_WriteBig( buf, 0, 9, !invert_dial);
+}
+void dial_event_handler(ui_event_t evt){
+
+    menu_timeout = 0;
+    tv_speed_t speed = tv_get_speed();
+
+    ESP_LOGI(TAG, "dial event: %d", evt.type);
+
+    switch(evt.type){
+        case UI_ROTOR_INC:
+            dial_idx = (dial_idx - 1 + DIAL_NUM_FRAMES) % DIAL_NUM_FRAMES;
+            speed.interframe_millis = MIN(99, speed.interframe_millis + 1);
+            tv_set_speed(speed);
+        break;
+        case UI_ROTOR_DEC:
+            dial_idx = (dial_idx + 1) % DIAL_NUM_FRAMES;
+            speed.interframe_millis = MAX(1, speed.interframe_millis - 1);
+            tv_set_speed(speed);
+        break;
+        case UI_SHORT_PRESS:
+        case UI_MEDIUM_PRESS:
+            set_next_state(&brightness_state);
+            return;
+        break;
+        case UI_LONG_PRESS:
+            set_next_state(&settings_state);
+            return;
+        break;
+        default:
+            return;
+    }   
+
+    dial_render();
+}

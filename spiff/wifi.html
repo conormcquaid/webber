@@ -1,98 +1,49 @@
-<!doctype html>
-<html lang="en">
+<!DOCTYPE html>
+<html  data-theme="dark">
   <head>
-    <!-- Required meta tags -->
     <meta charset="utf-8">
-    <meta name="viewport" content="width=80%, initial-scale=1">
- <!--   <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no"> -->  
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="color-scheme" content="light dark">
+    <link rel="stylesheet" type="text/css" href="./pico.min.css">
+    <title>EMPIRE Network Setup</title>
+  </head>
+  <body>
+  <main class="container"><section text-align="center"> 
+   <div style="text-align: center;"> <h1>Slow TV Network Setup</h1>
+    <p>Tell me how to connect to your network</p></div>
+</section>
+<form  action="/" method="post">
+<fieldset>
+<label>Network SSID
+<input name="new_ssid" placeholder="wifi network name"  />
+</label>
 
-<title>foo bears</title>
-<link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png">
-<link rel="icon" type="image/png" sizes="32x32" href="favicon-32x32.png">
-<link rel="icon" type="image/png" sizes="16x16" href="favicon-16x16.png">
-<link rel="manifest" href="/site.webmanifest">
+<label>Password
+<input type="password" name="new_pwd" placeholder="1234"  />
 
-<link rel="stylesheet" type="text/css" href="pico.min.css">
+</fieldset>
 
-<script>
+<input type="submit" value="Activate" />
+</form>
+<br>
+<!-- <section>
+  <details name="detail_name" closed>
+    <summary>Saved networks</summary>
+ 
+      <table>
+        <tr><td>&nbsp;</td><td>SSID1</td><td><kbd id = 1 onclick="do_alert(this.id)">DEL</kbd></td></tr>
+        <tr><td>&nbsp;</td><td>SSID2</td><td><kbd id = 1 onclick="do_alert(this.id)">DEL</kbd></td></tr>
+      </table>
 
-function getWifiCreds() {
-    var result = null;
-    var xmlhttp = new XMLHttpRequest();
-    xmlhttp.open("GET", "wifi.txt", false);
-    xmlhttp.send();
-    if (xmlhttp.status==200) {
-        result = xmlhttp.responseText;
+  </details>
+</section> -->
+
+    </main>
+    <footer class="container"><h6>© cmcq.com</h6></footer>
+  </body>
+  <script>
+    function do_alert(e){
+      alert(e)
     }
-    return result;
-}
-
-function populateWifiCreds(){
-
-    var wificreds = getWifiCreds().split(",");
-
-    console.log(wificreds);
-
-    document.getElementById("ssid").value = wificreds[0];
-    document.getElementById("pwd").value = wificreds[1];
-
-}
-</script>
-
-</head>
-<body onload="populateWifiCreds()"><div class="content">
-    <header class="header">
-        <a href="/" class="logo">foo</a>
-        <input class="menu-btn" type="checkbox" id="menu-btn" />
-        <label class="menu-icon" for="menu-btn"><span class="navicon"></span></label>
-        <ul class="menu">
-            <li><a href="index.html">Home</a></li>
-            <li><a href="wifi.html">WiFi</a></li>
-            <li><a href="leds.html">LEDs</a></li>
-            <li><a href="movies.html">Movies</a></li>
-            <li><a href="about.html">About</a></li>
-          
-          
-        </ul>
-      </header>
-
-    <div class="formm">
-        
-        <div class="row  roww" id="some_row">
-            <div class="col roww" id="btn col">
-
-                <form action="wifi.html" method="POST">
-                    <div class="form-group roww">
-                        <label for="ssid">WiFi Network </label><br>
-                        <input type="text" id="ssid" name="ssid" required>
-                    </div>
-                    <div class="form-group roww">
-                        <label for="pwd">Password </label><br>
-                        <input type="password" id="pwd" name="pwd" required>
-                    </div>
-
-                    <button type="submit" action="wifi.html" class="butsub butadd">Submit</button>
-                    <br>
-                    
-
-                </form>
-                        
-             </div> 
-        </div>
-      
-        <div class="row border " id="pin_select_row1">
-             <!-- dynamically created options go here -->
-        </div>
-        
-        <div class="row border " id="pin_select_row2">
-             <!-- more dynamically created options go here -->
-        </div>
-        
-       
-        
-      </div><!-- end container -->
-    </div>
-
-</body>
-
+  </script>
 </html>

@@ -22,8 +22,10 @@ QueueHandle_t qRotor; // notify rotary encoder events externally
 
 static const char *TAG = "rotary";
 
-#define EXAMPLE_PCNT_HIGH_LIMIT  4
-#define EXAMPLE_PCNT_LOW_LIMIT  -4
+
+// TODO: these numbers should come from HW config rotor count
+#define EXAMPLE_PCNT_HIGH_LIMIT  2
+#define EXAMPLE_PCNT_LOW_LIMIT  -2
 
 #define ROTOR_EC11_GPIO_A   GPIO_NUM_37
 #define ROTOR_EC11_GPIO_B   GPIO_NUM_38
@@ -39,7 +41,7 @@ static bool example_pcnt_on_reach(pcnt_unit_handle_t unit, const pcnt_watch_even
 
     ui_event_t evt;
     int rotor_count = edata->watch_point_value;
-    if(tv_config_block.rotor_dir == ROTOR_DIR_CCW){
+    if(tv_hw_config.rotor_dir == ROTOR_DIR_CCW){
         rotor_count *= -1;
     }
     evt.type = (rotor_count > 0) ? UI_ROTOR_INC : UI_ROTOR_DEC;
@@ -50,9 +52,9 @@ static bool example_pcnt_on_reach(pcnt_unit_handle_t unit, const pcnt_watch_even
     return (high_task_wakeup == pdTRUE);
 }
 
-
 void init_rotary_encoder(void* p)
 {
+    int dir = tv_hw_config.rotor_dir ==  ROTOR_DIR_CW ?  1 : -1;
     // init pins as gpios first
     gpio_config_t io_conf = {
         .intr_type = GPIO_INTR_DISABLE,
@@ -66,7 +68,7 @@ void init_rotary_encoder(void* p)
     ESP_LOGI(TAG, "install pcnt unit");
     pcnt_unit_config_t unit_config = {
         .high_limit = EXAMPLE_PCNT_HIGH_LIMIT,
-        .low_limit = EXAMPLE_PCNT_LOW_LIMIT,
+        .low_limit  = EXAMPLE_PCNT_LOW_LIMIT,
         .flags.accum_count = false        
     };
     pcnt_unit_handle_t pcnt_unit = NULL;
@@ -96,14 +98,14 @@ void init_rotary_encoder(void* p)
     ESP_ERROR_CHECK(pcnt_new_channel(pcnt_unit, &chan_b_config, &pcnt_chan_b));
 
     ESP_LOGI(TAG, "set edge and level actions for pcnt channels");
-    ESP_ERROR_CHECK(pcnt_channel_set_edge_action(pcnt_chan_a, PCNT_CHANNEL_EDGE_ACTION_DECREASE, PCNT_CHANNEL_EDGE_ACTION_INCREASE));
-    ESP_ERROR_CHECK(pcnt_channel_set_level_action(pcnt_chan_a, PCNT_CHANNEL_LEVEL_ACTION_KEEP, PCNT_CHANNEL_LEVEL_ACTION_INVERSE));
-    ESP_ERROR_CHECK(pcnt_channel_set_edge_action(pcnt_chan_b, PCNT_CHANNEL_EDGE_ACTION_INCREASE, PCNT_CHANNEL_EDGE_ACTION_DECREASE));
-    ESP_ERROR_CHECK(pcnt_channel_set_level_action(pcnt_chan_b, PCNT_CHANNEL_LEVEL_ACTION_KEEP, PCNT_CHANNEL_LEVEL_ACTION_INVERSE));
+    ESP_ERROR_CHECK(pcnt_channel_set_edge_action( pcnt_chan_a, PCNT_CHANNEL_EDGE_ACTION_DECREASE, PCNT_CHANNEL_EDGE_ACTION_INCREASE));
+    ESP_ERROR_CHECK(pcnt_channel_set_level_action(pcnt_chan_a, PCNT_CHANNEL_LEVEL_ACTION_KEEP,    PCNT_CHANNEL_LEVEL_ACTION_INVERSE));
+    ESP_ERROR_CHECK(pcnt_channel_set_edge_action( pcnt_chan_b, PCNT_CHANNEL_EDGE_ACTION_INCREASE, PCNT_CHANNEL_EDGE_ACTION_DECREASE));
+    ESP_ERROR_CHECK(pcnt_channel_set_level_action(pcnt_chan_b, PCNT_CHANNEL_LEVEL_ACTION_KEEP,    PCNT_CHANNEL_LEVEL_ACTION_INVERSE));
 
      ESP_LOGI(TAG, "add watch points and register callbacks");
 //  //   int watch_points[] = {EXAMPLE_PCNT_LOW_LIMIT, -50, 0, 50, EXAMPLE_PCNT_HIGH_LIMIT};
-    int watch_points[] = { tv_config_block.rotor_clicks, -tv_config_block.rotor_clicks };
+    int watch_points[] = { tv_hw_config.rotor_clicks, -tv_hw_config.rotor_clicks };
 
      for (size_t i = 0; i < sizeof(watch_points) / sizeof(watch_points[0]); i++) {
          ESP_ERROR_CHECK(pcnt_unit_add_watch_point(pcnt_unit, watch_points[i]));
@@ -120,10 +122,6 @@ void init_rotary_encoder(void* p)
     ESP_ERROR_CHECK(pcnt_unit_clear_count(pcnt_unit));
     ESP_LOGI(TAG, "start pcnt unit");
     ESP_ERROR_CHECK(pcnt_unit_start(pcnt_unit));
-
-
-
-
 
 #if CONFIG_EXAMPLE_WAKE_UP_LIGHT_SLEEP
     // EC11 channel output high level in normal state, so we set "low level" to wake up the chip

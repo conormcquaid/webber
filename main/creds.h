@@ -5,6 +5,8 @@
 
 #include "esp_err.h"
 #include "nvs_flash.h"
+#include "main.h"
+#include "tv.h"
 
 #define SSID_KEY "new_ssid"
 #define PWD_KEY  "new_pwd"
@@ -32,6 +34,11 @@ esp_err_t add_credential(WifiCred* cred);
 esp_err_t remove_wifi_creds();
 
 esp_err_t get_credentials(WifiCred** pCreds, uint8_t* n);
+
+esp_err_t load_hw_config(tv_hardware_config_t* pConfig);
+esp_err_t save_hw_config(tv_hardware_config_t* pConfig);    
+esp_err_t save_tv_preferences(tv_preferences_t* pPrefs);
+esp_err_t load_tv_preferences(tv_preferences_t* pPrefs);
 
 
 

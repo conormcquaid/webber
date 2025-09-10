@@ -60,6 +60,6 @@ void STATE_NAME ## _render(void); \
 //TODO: including a render fumction may be unnecessary
 
 //TODO: initilizes oled. owns all OLED txns
-TaskHandle_t ui_init(tv_status_t* tv_status);
+TaskHandle_t ui_init(tv_runtime_status_t* tv_status);
 
 #endif /* __UI_STATE_H__ */

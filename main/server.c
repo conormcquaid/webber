@@ -146,18 +146,17 @@ static struct file_server_data *server_data;
 #define IS_FILE_EXT(filename, ext) \
     (strcasecmp(&filename[strlen(filename) - sizeof(ext) + 1], ext) == 0)
 
-extern int get_wifi_from_post(char* post, char** ssid, char** pwd, char** host, int* port);
+extern int get_wifi_from_post(char* post, char** ssid, char** pwd);
 
 esp_err_t post_process(char* post){
 
     char* pwd = NULL;
     char* ssid = NULL;
-    char* host = NULL;
-    int port;
 
-    get_wifi_from_post(post, &ssid, &pwd, &host, &port);
 
-    ESP_LOGI(TAG, "post process got %s and %s and %s\n", ssid, pwd, host);
+    get_wifi_from_post(post, &ssid, &pwd);
+
+    ESP_LOGI(TAG, "post process got %s and %s\n", ssid, pwd);
 
     if(ssid == NULL || pwd == NULL){ return ESP_ERR_NOT_FOUND; }
 
@@ -167,8 +166,8 @@ esp_err_t post_process(char* post){
     WifiCred cred;
     bzero(&cred, sizeof(WifiCred));
 
-    memcpy(cred.ssid, ssid, strlen(ssid)+1);
-    memcpy(cred.pwd,  pwd,  strlen(pwd) +1);
+    memcpy(cred.ssid, ssid, strlen(ssid));
+    memcpy(cred.pwd,  pwd,  strlen(pwd));
     // memcpy(cred.host, host, strlen(host)+1);
     // cred.port = port;
     // WifiCred cred={
@@ -285,6 +284,10 @@ static esp_err_t spiff_serve(httpd_req_t *req)
 
 
     printf("+ root get with fname %s\n",filename);
+
+    if(filename[0] == '/' && filename[1] == '\0'){
+        strcat(filename, "index.html");
+    }
 
 
 	// check if it exists on SPIFFS

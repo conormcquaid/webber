@@ -28,23 +28,145 @@ static const char* TAG = "sdcard";
 
 #define MOUNT_POINT "/sdcard"
 
-
+static tv_runtime_status_t* pRuntime = NULL;
 
 DIR* dirp;
 FILE* f = NULL;
 int file_count = 0;
 static uint32_t frame_number = 0;
 static struct stat st;
+char filepath[260];
+
+
+// int get_next_valid_file(bool loop, int resolution){
+
+//     bool file_found = true;
+//     bool looped = false;
+//     while(!file_found && !looped){
+
+//         struct dirent* dint = readdir(dirp);
+//         if(dint == NULL){
+//             if(loop){
+//                 looped = true;
+//                 rewinddir(dirp);
+//                 dint = readdir(dirp);
+//                 if(dint == NULL){
+//                     ESP_LOGE(TAG, "No files found on sdcard");
+//                     return 0;
+//                 }
+//             } else {
+//                 ESP_LOGI(TAG, "No more files found on sdcard");
+//                 return 0;
+//             }
+//         }
+//         if(dint->d_type == DT_REG){
+
+//             if(stat(dint->d_name, &st) == 0){
+
+//                 if(resolution){
+//                     if(st.st_size % resolution == 0){
+//                         file_found = true;
+//                     } 
+//                 } else {
+//                     file_found = true;  
+//                 }
+//                 if(file_found){
+
+//                     pRuntime->file_size_bytes = st.st_size;
+//                     pRuntime->frame_number = 0;
+//                     pRuntime->file_frame_count = 0;
+//                     strncpy(pRuntime->current_file, dint->d_name, 260);
+
+//                     ESP_LOGI(TAG, "Found valid file %s, size %ld", dint->d_name, st.st_size);
+//                 } else {
+//                     f = fopen(dint->d_name, "r");
+//                     if(f == NULL){
+//                         ESP_LOGE(TAG, "Failed to open file %s", dint->d_name);
+//                         file_found = false;
+//                     } else {
+//                         ESP_LOGI(TAG, "Opened file %s, size %ld", dint->d_name, st.st_size);
+//                         return 1;
+//                     }
+//                 }
+//         } else {
+//            // ESP_LOGI(TAG, "Ignoring non-file item: %s", dint->d_name);
+//         }
+    
+//     }
+//     }
+//     return 0; // no luck
+// }
+
+int get_next_valid_file(bool loop, int resolution){
+
+    bool file_found = false;
+    bool looped = false;
+
+    while(!file_found && !looped){
+
+        struct dirent* dint = readdir(dirp);
+        if(dint == NULL){
+            if(loop){
+                looped = true;
+                rewinddir(dirp);
+                dint = readdir(dirp);
+                if(dint == NULL){
+                    ESP_LOGI(TAG,   "==>No files found on sdcard\n");
+                    return 0;
+                }
+            } else {
+                ESP_LOGI(TAG,   "==>No more files found on sdcard\n");
+                return 0;
+            }
+        }
+        if(dint->d_type == DT_REG){
+
+            snprintf(filepath, sizeof(filepath) - 10, "%.10s/%.240s", MOUNT_POINT, dint->d_name);
+
+            if(stat(filepath, &st) == 0){  //<== filepath!!
+
+                if(resolution){
+                    if(st.st_size % resolution == 0){
+                        file_found = true;
+                    } 
+                } else {
+                    file_found = true;  
+                }
+                if(file_found){
+                    
+                    //printf( "Found valid file %s, size %ld\n", dint->d_name, st.st_size);
+                    pRuntime->file_size_bytes = st.st_size;
+                    pRuntime->frame_number = 0;
+                    //pRuntime->file_frame_count = 0;
+                    strncpy(pRuntime->current_file, dint->d_name, 260);
+                    
+                    f = fopen(filepath, "r");
+                    if(f == NULL){
+                        ESP_LOGI(TAG,  "==>Failed to open file %s\n", dint->d_name);
+                        file_found = false;
+                    } else {
+                        //printf( "Opened file %s, size %ld\n", dint->d_name, st.st_size);
+                        fclose(f);
+                        return 1;
+                    }
+                    
+                } 
+            } 
+    
+        }
+    }
+    return 0; // no luck
+}
 
 
 void enumerate_files(void){
     struct dirent* dint;
-    char fname[260];
+    //char fname[260];
     
     while((dint = readdir(dirp)) != NULL){
         if(dint->d_type == DT_REG){
-            snprintf(fname, sizeof(fname) - 10, "%.10s/%.240s", MOUNT_POINT, dint->d_name);
-            if(stat(fname, &st) == 0){
+            snprintf(filepath, sizeof(filepath) - 10, "%.10s/%.240s", MOUNT_POINT, dint->d_name);
+            if(stat(filepath, &st) == 0){
                 ESP_LOGI(TAG, "Found file: %s, size %ld", dint->d_name, st.st_size);
                 file_count++;
                 if(st.st_size % 54 == 0){
@@ -53,7 +175,7 @@ void enumerate_files(void){
                     ESP_LOGW(TAG, "File %s may be Lo-fi*", dint->d_name);
                 }
             } else {
-                ESP_LOGE(TAG, "Stat failed for %s with errno %d", fname, errno);
+                ESP_LOGE(TAG, "Stat failed for %s with errno %d", filepath, errno);
             }
         } else if(dint->d_type == DT_DIR){
             ESP_LOGI(TAG, "Ignoring directory: %s", dint->d_name);
@@ -64,7 +186,7 @@ void enumerate_files(void){
 }
 
 //TODO: handle errors from here
-void open_next_file(tv_status_t* pTV) {
+void open_next_file(tv_runtime_status_t* pTV) {
     if(f) {
         fclose(f);
         f = NULL;
@@ -74,9 +196,12 @@ void open_next_file(tv_status_t* pTV) {
         if (set_cur_file(fname)) {
             ESP_LOGI(TAG, "Opened file %s successfully", fname);
 
-            if(stat(fname, &st) == 0){
+            if(stat(filepath, &st) == 0){
 
                 pTV->file_size_bytes = st.st_size;
+                pTV->file_frame_count = st.st_size / 54; // TODO: this belongs elsewhere, or how do I know resolution?
+            }else{
+                ESP_LOGI(TAG, "Stat failed for %s: error %d", fname, errno);
             }
             
             
@@ -92,10 +217,11 @@ void open_next_file(tv_status_t* pTV) {
 }
 
 
-esp_err_t init_sd(void){
+esp_err_t init_sd(tv_runtime_status_t* pRT){
+
+    pRuntime = pRT;
 
     esp_err_t ret;
-
 
     esp_vfs_fat_sdmmc_mount_config_t mount_config = {
 #ifdef CONFIG_EXAMPLE_FORMAT_IF_MOUNT_FAILED
@@ -172,7 +298,7 @@ esp_err_t init_sd(void){
     // Enumerate files in the directory
     enumerate_files();
 
-    //rewind and open first file in preparation for reading
+    //rewind 
     rewinddir(dirp);
 
     return ESP_OK;
@@ -199,7 +325,9 @@ int getFrame(uint8_t * pFrame){
 	//char num[16];
 	//sprintf(num, "%d", frame_number);
     if((frame_number % 32) == 0){
-         printf("Frame: %04ld\n", frame_number);
+        uint8_t pct = (100.0 * frame_number) / pRuntime->file_frame_count ;
+         printf("Frame: %04ld / %04ld %d %%\n", pRuntime->frame_number, pRuntime->file_frame_count, pct);
+         //pRuntime->frame_number = frame_number;
     }
 
 	//OLED_WriteBig(num,2,0);
@@ -208,7 +336,7 @@ int getFrame(uint8_t * pFrame){
 
     if(feof(f)){
         printf("End of file reached\n");
-        return -1;
+        return -1   ;
     }
     if(ferror(f)){
         printf("Error reading file\n");
@@ -254,17 +382,15 @@ char* getNextFilename(char* name, size_t len){
 
 int set_cur_file(char *fn){
 
-    char filename[260];
-
-    strcpy(filename, "/sdcard/");
-    strcat(filename, fn);
+    strcpy(filepath, "/sdcard/");
+    strcat(filepath, fn);
 
     fclose(f);// penalty if f not open?
 
-    f = fopen(filename, "r");
+    f = fopen(filepath, "r");
 
     if(f == NULL){
-        ESP_LOGE(TAG, "File open of %s failed with errno %d\n", filename, errno);
+        ESP_LOGE(TAG, "File open of %s failed with errno %d\n", filepath, errno);
     }
 
     return (f!=NULL);

@@ -12,33 +12,6 @@
 
 #define MDNS_HOSTNAME "tv-remote"
 
-#define FRAME_RESOLUTION_HIGH (6*9)
-#define FRAME_RESOLUTION_LOW (3*5)
-
-extern int g_frame_size;
-
-//TODO: amalgamte tv state, config, status into two structs, one persistent and one ephemeral
-
-//TODO: fix references to tv_speed
-
-typedef struct{
-    uint8_t tweens; // 1-10
-    uint8_t interframe_millis; 
-}tv_speed_t;
-
-typedef struct{
-
-    char      current_file[260];
-    float     brightness;
-    uint32_t  file_size_bytes;
-    uint32_t  file_frame_count;
-    uint32_t  frame_number;
-    char      ip_addr[16];
-    char      ssid[32];
-    tv_speed_t speed;;
-
-}tv_status_t;
-
 
 typedef union{
     uint32_t color;
@@ -51,6 +24,13 @@ typedef union{
 } RGBColor;
 
 extern RGBColor lamp_rgbc;
+
+#define FRAME_RESOLUTION_HIGH (6*9)
+#define FRAME_RESOLUTION_LOW (3*5)
+
+extern int g_frame_size;
+
+    
 
 typedef enum{ 
     ROTOR_DIR_NONE,
@@ -78,29 +58,69 @@ typedef enum{
 }tv_interpolation_t;
 
 typedef enum {
-    TV_MODE_SEQUENTIAL,
+    TV_MODE_OFF,         /* sure, why not? */
+    TV_MODE_SEQUENTIAL,  /* 'TV' modes */
     TV_MODE_LOOP,
     TV_MODE_RANDOM,
-    TV_MODE_LAMP, /* have a solid hue?*/
-    TV_MODE_LIFE, /* Conway FTW */
-    TV_MODE_OFF /* sure, why not? */
+    TV_MODE_LAMP,       /* have a solid hue?*/
+    TV_MODE_LIFE,       /* Conway FTW */
+
 }tv_mode_t;
 
-
+typedef struct{
+    uint8_t tweens; // 1-10
+    uint8_t interframe_millis; 
+}tv_speed_t;
 
 typedef struct{
-    rotor_dir_t rotor_dir;
-    rotor_clicks_t rotor_clicks;
-    tv_resolution_t resolution;
+
+    char      ip_addr[16];
+    char      ssid[32];
+
+}wifi_status_t;
+
+// persistable preferences
+
+typedef struct{
+
+    tv_mode_t          mode;
+    float              brightness;
+    tv_speed_t         speed;
     tv_interpolation_t interpolation;
-    tv_mode_t mode;
-    tv_speed_t speed;
-    uint8_t bytes_per_LED;
-}tv_config_block_t;
+    
+}tv_preferences_t;
+
+// runtime data
+
+typedef struct{
+
+    char      current_file[260];
+    uint32_t  file_size_bytes;
+    uint32_t  file_frame_count;
+    uint32_t  frame_number;
+
+
+}tv_runtime_status_t;
+
+
+
+
+
+// HW specific configuration
+// Only changes if display &| rotary encoder change
+
+typedef struct{
+
+    rotor_dir_t        rotor_dir;
+    rotor_clicks_t     rotor_clicks;
+    tv_resolution_t    resolution;
+    uint8_t            bytes_per_LED;
+
+}tv_hardware_config_t;
 
 // globally accessible config block
 // persisted in NVS
-extern tv_config_block_t tv_config_block;
+extern tv_hardware_config_t tv_hw_config;
 
 
 extern QueueHandle_t qSuperMessage;

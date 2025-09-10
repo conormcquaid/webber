@@ -181,14 +181,14 @@ void OLED_fill2(uint8_t start_column, uint8_t end_column, uint8_t start_line, ui
     uint8_t* buf = i2c_oled_buffer;
 	*buf++ = 0x40; // data mode
 
-	int num_bytes = (end_line - start_line) * (end_column - start_column + 1);
+	int num_bytes = (end_line - start_line +1) * (end_column - start_column + 1);
     
 	
     if(!source){
 		// make our own data buffer
 
         for(int y=0; y < 128 * 8; y++){
-            *buf++ = 0xaa;
+            *buf++ = 0x00;
         }
     }else{
 		// use supplied data buffer

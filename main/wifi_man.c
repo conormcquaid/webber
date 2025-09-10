@@ -46,7 +46,7 @@ uint8_t   nCredentials;
 
 extern void websocket_task(void* nada);
 
-#define COTTAGE 99
+//#define COTTAGE
 /* STA Configuration */
 #ifdef COTTAGE
 #define EXAMPLE_ESP_WIFI_STA_SSID           "NETGEAR06"
@@ -277,6 +277,8 @@ void wifi_init_apsta(void){
         ESP_LOGI(TAG_STA, "connected to ap SSID:%s password:%s",
                  EXAMPLE_ESP_WIFI_STA_SSID, EXAMPLE_ESP_WIFI_STA_PASSWD);
 ////////////////////////////////////////////////        
+///////////////////////////////////////////////////////////////////
+
 softap_set_dns_addr(esp_netif_ap,esp_netif_sta);
 
     } else if (bits & WIFI_FAIL_BIT) {

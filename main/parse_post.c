@@ -48,7 +48,7 @@ char* url_decode_inplace(char* encoded_str) {
     return encoded_str;
 }
 
-int get_wifi_from_post(char* post, char** ssid, char** pwd, char** host, int* port){
+int get_wifi_from_post(char* post, char** ssid, char** pwd){
 
     char* key = post;
     char* start = post;
@@ -72,10 +72,10 @@ int get_wifi_from_post(char* post, char** ssid, char** pwd, char** host, int* po
 
         if(0 == strcmp(SSID_KEY,  key)){ *ssid = strdup(val); }
         if(0 == strcmp(PWD_KEY,   key)){ *pwd  = strdup(val); }
-        if(0 == strcmp(HOST_KEY,  key)){ *host = strdup(val); }
-        if(0 == strcmp(PORT_KEY,  key)){ *port = atoi(val); }
+
 
 	}
-    ESP_LOGI(TAG, "get_wifi got %s and %s and %s and %d\n", *ssid, *pwd, *host, *port);
+    if(!ssid || !pwd){ return -1; }
+    ESP_LOGI(TAG, "get_wifi got %s and %s\n", *ssid, *pwd);
     return 0;
 }

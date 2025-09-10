@@ -17,7 +17,10 @@ static uint32_t frame_count; // TODO: get this from the getting place
 extern void gamma_bright_correct(uint8_t* r, uint8_t* g, uint8_t* b, float bright);
 
 
-tv_config_block_t tv_config_block;
+tv_hardware_config_t tv_hw_config;
+tv_preferences_t     tv_prefs;
+extern tv_runtime_status_t  tv_status;
+
 
 int g_frame_size;
 static int nLEDs;
@@ -55,28 +58,30 @@ led_strip_handle_t configure_led(void)
 }
 
 
-TaskHandle_t tv_init(tv_status_t* tv_status){
+TaskHandle_t tv_init(tv_runtime_status_t* pTV_status){
 
     
-    tv_config_block.rotor_dir = ROTOR_DIR_CCW;
-    tv_config_block.rotor_clicks = ROTOR_CLICKS_TWO;
-    tv_config_block.resolution = TV_RESOLUTION_HIGH;
-  //tv_config_block.interpolation = TV_INTERPOLATE_NONE;
-    tv_config_block.interpolation = TV_INTERPOLATE_LINEAR_RGB;
-    tv_config_block.mode = TV_MODE_SEQUENTIAL;
-    tv_config_block.speed.tweens = 5;
-    tv_config_block.speed.interframe_millis = 41;
-    tv_config_block.bytes_per_LED = 3 ;
+    tv_hw_config.rotor_dir     = ROTOR_DIR_CCW;
+    tv_hw_config.rotor_clicks  = ROTOR_CLICKS_TWO;
+    tv_hw_config.resolution    = TV_RESOLUTION_HIGH;
+    tv_hw_config.bytes_per_LED = 3 ;
+
+    tv_prefs.brightness = 0.5;
+    tv_prefs.mode = TV_MODE_SEQUENTIAL;
+    tv_prefs.interpolation = TV_INTERPOLATE_LINEAR_RGB;
+    tv_prefs.speed.interframe_millis = 41;
+    tv_prefs.speed.tweens = 10;
+    
 
 
-    g_frame_size = (tv_config_block.resolution == TV_RESOLUTION_HIGH ? FRAME_RESOLUTION_HIGH : FRAME_RESOLUTION_LOW) * tv_config_block.bytes_per_LED;
-    nLEDs = (tv_config_block.resolution == TV_RESOLUTION_HIGH ? FRAME_RESOLUTION_HIGH : FRAME_RESOLUTION_LOW);
+    g_frame_size = (tv_hw_config.resolution == TV_RESOLUTION_HIGH ? FRAME_RESOLUTION_HIGH : FRAME_RESOLUTION_LOW) * tv_hw_config.bytes_per_LED;
+    nLEDs = (tv_hw_config.resolution == TV_RESOLUTION_HIGH ? FRAME_RESOLUTION_HIGH : FRAME_RESOLUTION_LOW);
 
-    esp_err_t e = init_sd();
+    esp_err_t e = init_sd(&tv_status);
 
     if(e != ESP_OK){
         ESP_LOGE(TAG, "SD Card init failed, setting TV mode to OFF");
-        tv_config_block.mode = TV_MODE_LAMP;
+        tv_prefs.mode = TV_MODE_LAMP;
     }
 
     led_strip = configure_led();
@@ -95,14 +100,14 @@ TaskHandle_t tv_init(tv_status_t* tv_status){
 
     TaskHandle_t hTV;
 
-    xTaskCreatePinnedToCore(tv_task, "tv_task", 4096, tv_status, configMAX_PRIORITIES-3, &hTV, 1);
+    xTaskCreatePinnedToCore(tv_task, "tv_task", 4096, pTV_status, configMAX_PRIORITIES-3, &hTV, 1);
 
     return hTV;
 }
 
 
 
-void tv_open_next_file(tv_status_t* pTV){
+void tv_open_next_file(tv_runtime_status_t* pTV){
 
     // TODO: depends on tv mode being seq, rand, loop
     open_next_file(pTV);
@@ -117,11 +122,11 @@ void tv_open_next_file(tv_status_t* pTV){
 */
 void interpolate_linear_rgb(int tween){
        
-    assert(tv_config_block.bytes_per_LED = 3);
+    assert(tv_hw_config.bytes_per_LED = 3);
     // TODO: really should be dealing with LED structs which have 4 bytes, may use only 3. FBs should be arrays of these
 
     // memoize tweens and validate
-    int tweens = tv_config_block.speed.tweens;
+    int tweens = tv_prefs.speed.tweens;
     tweens = (tweens < 1) ? 1 : tweens;
 
     if(tween == 0){
@@ -181,13 +186,13 @@ void act_like_a_lamp(void){
     // }
     led_strip_refresh(led_strip);
 
-    vTaskDelay(pdMS_TO_TICKS(tv_config_block.speed.interframe_millis));
+    vTaskDelay(pdMS_TO_TICKS(tv_prefs.speed.interframe_millis));
 }
 
 
 void tv_task(void* param){
 
-    tv_status_t* pTV = (tv_status_t*)param;
+    tv_runtime_status_t* pTV = (tv_runtime_status_t*)param;
 
     currFB   = malloc(g_frame_size);
     prevFB   = malloc(g_frame_size);
@@ -195,10 +200,15 @@ void tv_task(void* param){
     delta    = malloc(g_frame_size);
 
 
-    tv_config_block.interpolation = TV_INTERPOLATE_NONE;
+    tv_prefs.interpolation = TV_INTERPOLATE_NONE;
+    // TODO initialize preferences from NVS or use defaults
+    // tv_prefs.brightness = 1.0;
+    // tv_prefs.speed.tweens = 7;
+    // tv_prefs.speed.interframe_millis = 41;
+
 
     if(!currFB || !prevFB){
-        tv_config_block.mode = TV_MODE_LAMP;
+        tv_prefs.mode = TV_MODE_LAMP;
     }
 
     // TODO: iff we have a valid sdcard attached
@@ -212,7 +222,7 @@ void tv_task(void* param){
 
         static int one_second_accum = 0;
 
-        switch(tv_config_block.mode){
+        switch(tv_prefs.mode){
 
             case TV_MODE_OFF:
 
@@ -263,7 +273,7 @@ void tv_task(void* param){
             pTV->frame_number = frame_count;
             // customize behavior based on interpolation mode
 
-            if(tv_config_block.interpolation == TV_INTERPOLATE_NONE){
+            if(tv_prefs.interpolation == TV_INTERPOLATE_NONE){
                 uint8_t* pPixel = currFB;
                 for(int p = 0; p < nLEDs; p++){
 
@@ -271,17 +281,17 @@ void tv_task(void* param){
                     r = *pPixel;
                     g = *(pPixel + 1);
                     b = *(pPixel + 2);
-                    gamma_bright_correct(&r, &g, &b, pTV->brightness);
+                    gamma_bright_correct(&r, &g, &b, tv_get_brightness());
                     
                     led_strip_set_pixel(led_strip, p, r, g, b);
-                    pPixel += tv_config_block.bytes_per_LED;
+                    pPixel += tv_hw_config.bytes_per_LED;
                     
                     led_strip_refresh(led_strip);
 
                 }
-            }else if(tv_config_block.interpolation == TV_INTERPOLATE_LINEAR_RGB ){
+            }else if(tv_prefs.interpolation == TV_INTERPOLATE_LINEAR_RGB ){
 
-                for(int i = 0; i < tv_config_block.speed.tweens; i++){
+                for(int i = 0; i < tv_prefs.speed.tweens; i++){
                     interpolate_linear_rgb(i);
                     //vTaskDelay(pdMS_TO_TICKS(tv_config_block.speed.interframe_millis));
                 }
@@ -292,11 +302,11 @@ void tv_task(void* param){
             
         
         // once a second or so, we should push progress notification to web and gui info block
-        vTaskDelay(pdMS_TO_TICKS(tv_config_block.speed.interframe_millis));
+        vTaskDelay(pdMS_TO_TICKS(tv_prefs.speed.interframe_millis));
 
-        one_second_accum += tv_config_block.speed.interframe_millis;
+        one_second_accum += tv_prefs.speed.interframe_millis;
         if(one_second_accum > 10*1000 ){
-            ESP_LOGI(TAG, "Speed.tweens %d, millis %d", tv_config_block.speed.tweens, tv_config_block.speed.interframe_millis);
+            ESP_LOGI(TAG, "Speed.tweens %d, millis %d", tv_prefs.speed.tweens, tv_prefs.speed.interframe_millis);
             ESP_LOGI(TAG,"Elapsed millis: %lld", esp_timer_get_time()/1000);
             one_second_accum = 0;
         }
@@ -307,13 +317,36 @@ void tv_task(void* param){
 void tv_play_file(const char* path);
 void tv_set_mode(tv_mode_t mode);
 void tv_set_state(tv_state_t state);
-tv_mode_t tv_get_mode(void);
 
-void tv_set_speed(tv_status_t* tv_status, tv_speed_t speed){
-    tv_config_block.speed.tweens = speed.tweens;
-    tv_config_block.speed.interframe_millis = speed.interframe_millis;
+tv_mode_t tv_get_mode(void){
+    
+    return tv_prefs.mode;
 }
-tv_speed_t tv_get_speed(tv_status_t* tv_status){
-    return tv_config_block.speed;
+
+void tv_set_speed(tv_speed_t speed){
+    tv_prefs.speed.tweens = speed.tweens;
+    tv_prefs.speed.interframe_millis = speed.interframe_millis;
+    save_tv_preferences(&tv_prefs);
 }
-tv_state_t tv_get_state(void);
+tv_speed_t tv_get_speed(void){
+    return tv_prefs.speed;
+}
+tv_state_t* tv_get_state(void){
+
+
+    // unused 
+
+
+    return (tv_state_t*)NULL;
+}
+tv_runtime_status_t* tv_get_runtime(void){
+    return &tv_status;
+}
+
+float tv_get_brightness(void){
+    return tv_prefs.brightness;
+}
+void  tv_set_brightness(float b){
+    tv_prefs.brightness = b;
+    save_tv_preferences(&tv_prefs);
+}

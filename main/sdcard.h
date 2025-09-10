@@ -12,7 +12,9 @@
 #include <esp_err.h>
 #include "main.h"
 
-esp_err_t init_sd(void);
+esp_err_t init_sd(tv_runtime_status_t* pRT);
+
+int get_next_valid_file(bool loop, int resolution);
 
 int getFrame(uint8_t * pFrame);
 
@@ -20,6 +22,6 @@ char* getNextFilename(char* f, size_t l);
 
 int set_cur_file(char *fname);
 
-void open_next_file(tv_status_t* pTV);
+void open_next_file(tv_runtime_status_t* pTV);
 
 #endif /* MAIN_SDCARD_H_ */

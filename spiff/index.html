@@ -1,23 +1,242 @@
 <!DOCTYPE html>
-<html>
-<head>
-<title>Welcome to nginx!</title>
-<style>
-html { color-scheme: light dark; }
-body { width: 35em; margin: 0 auto;
-font-family: Tahoma, Verdana, Arial, sans-serif; }
-</style>
-</head>
-<body>
-<h1>Welcome to nginx!</h1>
-<p>If you see this page, the nginx web server is successfully installed and
-working. Further configuration is required.</p>
+<html  data-theme="dark">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="color-scheme" content="light dark">
+    <link rel="stylesheet" type="text/css" href="./pico.min.css">
+    <title>EMPIRE Network Setup</title>
+    <style>
+          .large-char {
+            font-size: 3em; /* Make the character very large */
+            font-weight: bold;
+            line-height: 1; /* Adjust line-height to prevent extra spacing */
+            display: block; /* Make it a block element to control spacing */
+            padding: 0; /* Ensure no internal padding */
+            margin: 0; /* Ensure no internal margin */
+        }
+    </style>
+    <script>
+      var wLEDs = 9;
+      var hLEDs = 6;
+      var scale = 3;
+      var cvsHeight = (hLEDs + 1) * scale;
+      var cvsWidth = (wLEDs + 1) * scale;
+      var xStride = cvsWidth / (wLEDs+1);
+      var yStride = cvsHeight / (hLEDs+1);
+    </script>
+  </head>
+  <body>
+  <main class="container" style="text-align: center;">
+   <div text-align="center" style="text-align: center;"> <h3>Slow TV </h3></div>
+  
+   <div style="margin-bottom: 30px; padding: 10px; border: 1px solid var(--pico-form-element-border-color); background-color: var(--pico-card-background-color); display: inline-block;">
+    <canvas id="tvScreen" width=30 height=21></canvas>
+   </div>
+    <br>
 
-<p>For online documentation and support please refer to
-<a href="http://nginx.org/">nginx.org</a>.<br/>
-Commercial support is available at
-<a href="http://nginx.com/">nginx.com</a>.</p>
+    <div class="grid">
+      <div>&nbsp;</div>
+      <div>
+        <section class="table-container">
+            <table>
+              <tbody>
 
-<p><em>Thank you for using nginx.</em></p>
-</body>
+                  <td style="text-align: right;"><span class="large-char" alt="previous movie" style="text-align: right;" onclick="tv_Control('prev')">⏮</span></td>
+                  <td style="text-align: center;"><img src="play.svg" id="play_pause_img" style="width: 100%; height: 100%;"></td>
+                  <td style="text-align: left;"><span class="large-char" alt="next movie" onclick="tv_Control('next')" >⏭</span></td>
+                </tr>
+              </tbody>
+            </table>
+      </div>
+      </section>
+      <div>&nbsp;</div>
+       </div><!-- end grid-->     
+      <section class="container" style="width: 75%;" >
+      <label>Now playing:
+        <input id="CurrentFile" readonly>
+        </label>  
+            
+        <div class="slider-container">
+            <progress id="progressSlider" min="0" max="0" value="0" readonly>
+            
+        </div>
+        </section>
+      
+
+
+
+
+    </main>
+    <footer class="container" style='text-align: center;'><h5>© cmcq.com</h6></footer>
+    <script>
+
+      function hsv2rgb(h, s, v) {
+        let r, g, b;
+        let i = Math.floor(h * 6);
+        let f = h * 6 - i;
+        let p = v * (1 - s);
+        let q = v * (1 - f * s);
+        let t = v * (1 - (1 - f) * s);
+
+        switch (i % 6) {
+          case 0: r = v, g = t, b = p; break;
+          case 1: r = q, g = v, b = p; break;
+          case 2: r = p, g = v, b = t; break;
+          case 3: r = p, g = q, b = v; break;
+          case 4: r = t, g = p, b = v; break;
+          case 5: r = v, g = p, b = q; break;
+        }
+
+        return { r: r * 255, g: g * 255, b: b * 255 }; // Returns RGB values in [0, 255]
+      }
+
+      //const wsStatus = document.getElementById('wsStatus');
+      const ws = new WebSocket('ws://' + window.location.host + '/ws');
+      ws.onopen = () => {
+        console.log('ws opened on browser')
+        ws.send(JSON.stringify({ status: 'page loaded' }));
+      }
+
+        ws.onmessage = (event) => {
+            console.log('Message received:', event.data);
+            try {
+                const message = JSON.parse(event.data);
+                
+                if(message.type == 'NowPlaying'){
+
+                  var cf = document.getElementById('CurrentFile'); 
+                  var cp = document.getElementById('progressSlider');
+                  cf.value = message.filename;
+                  cp.max   = message.nFrames; 
+                  cp.value = message.frame;
+
+
+                } else if (message.type === 'status_update') {
+
+                    console.log('Status from ESP32:', message.text);
+                    // You could update a specific status div here
+
+                }
+            } catch (e) {
+                console.error('Failed to parse WebSocket message:', e);
+            }
+        };
+      
+      ws.onerror = (error) => {
+          console.error('WebSocket error:', error);
+          //wsStatus.innerText = 'WebSocket Status: Error!';
+      };
+      ws.onclose = () => {
+          console.log('WebSocket connection closed');
+          //wsStatus.innerText = 'WebSocket Status: Closed';
+      };
+
+      // const button1 = document.getElementById('button1');
+
+      // button1.onclick = () => {
+      //     if (ws.readyState === WebSocket.OPEN) {
+      //         ws.send(JSON.stringify({ 'TVcontrol':'prev' }));
+      //         console.log('Sent button1 click');
+      //     } else {
+      //         console.warn('WebSocket not open for button1 click');
+      //     }
+      // };
+
+
+      
+      const play_pause_img = document.getElementById('play_pause_img');
+      var playing = false;
+      play_pause_img.onclick = () => {
+          if (ws.readyState === WebSocket.OPEN) {
+              ws.send(JSON.stringify({ 'TVcontrol': playing ? 'pause' : 'play' }));
+              console.log('Sent play/pause click');
+              playing = !playing; 
+              play_pause_img.src = playing ? 'pause.svg' : 'play.svg';
+          } else {
+              console.warn('WebSocket not open for play/pause click');
+          }
+      };
+       function tv_Control(cmd){
+        console.log("command" + cmd);
+          if (ws.readyState === WebSocket.OPEN) {
+              ws.send(JSON.stringify({ 'TVcontrol':cmd }));
+              console.log('Sent prev click');
+          } else {
+              console.warn('WebSocket not open for tv remote');
+          }
+      }
+
+
+      const canvas = document.getElementById('tvScreen');
+      const ctx = canvas.getContext('2d');  
+      // const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+      // const pixelData = imageData.data;
+
+      for(let a = xStride; a < canvas.width; a += xStride) {
+        for(let b = yStride; b < canvas.height; b += yStride) {
+
+          const i = (b * canvas.width + a) * 4;
+
+          rgb = hsv2rgb((i % 360)/360, 1, 1);
+
+          ctx.beginPath();
+          ctx.arc(a, b, 1, 0, 2 * Math.PI);
+          ctx.fillStyle = `rgb(${rgb.r},${rgb.g},${rgb.b})`;
+          ctx.fill();
+          ctx.closePath();
+
+          // pixelData[i]     = 255;     // Red channel
+          // pixelData[i + 1] = 255; // Green channel
+          // pixelData[i + 2] = 255; // Blue channel
+          // pixelData[i + 3] = 255; // Alpha channel (fully opaque)
+        }
+      }
+      
+      // for(let y = 0; y < canvas.height; y+=3) {
+
+      //   for(let x = 0; x < canvas.width; x+=3) {
+
+      //     const i = (y * canvas.width + x) * 4;
+
+      //       // const r = pixelData[i];
+      //       // const g = pixelData[i + 1];
+      //       // const b = pixelData[i + 2];
+
+      //       rgb = hsv2rgb((i % 360)/360, 1, 1);
+
+      //       pixelData[i]     = rgb.r;     // Red channel
+      //       pixelData[i + 1] = rgb.g; // Green channel
+      //       pixelData[i + 2] = rgb.b; // Blue channel
+      //       pixelData[i + 3] = 255; // Alpha channel (fully opaque)
+
+      //   }
+      // }
+
+
+      // for(let i = 0; i < pixelData.length; i += 4) {
+      //   const r = pixelData[i];
+      //   const g = pixelData[i + 1];
+      //   const b = pixelData[i + 2];
+
+      //   rgb = hsv2rgb((i % 360)/360, 1, 1);
+
+      //   pixelData[i]     = rgb.r;     // Red channel
+      //   pixelData[i + 1] = rgb.g; // Green channel
+      //   pixelData[i + 2] = rgb.b; // Blue channel
+      //   pixelData[i + 3] = 255; // Alpha channel (fully opaque)
+
+      //   // // Convert to grayscale using luminosity method
+      //   // const gray = 0.21 * r + 0.72 * g + 0.07 * b;
+      //   // imageData[i] = gray;     // Red channel
+      //   // imageData[i + 1] = gray; // Green channel
+      //   // imageData[i + 2] = gray; // Blue channel
+      // }
+     
+      
+      //ctx.putImageData(imageData, 0, 0);  
+      
+
+    </script>
+  </body>
 </html>

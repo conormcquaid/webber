@@ -27,5 +27,8 @@ tv_runtime_status_t* tv_get_runtime(void);
 float tv_get_brightness(void);
 void  tv_set_brightness(float b);
 
+void tv_goto_next(void);
+void tv_goto_prev(void);
+
 
 #endif /* __TV_H__ */

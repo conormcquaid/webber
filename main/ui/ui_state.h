@@ -4,7 +4,7 @@
 #include "main.h"
 
 #define SHORT_PRESS_DURATION 100
-#define MEDIUM_PRESS_DURATION 300
+#define MEDIUM_PRESS_DURATION 500
 #define LONG_PRESS_DURATION 3000
 
 typedef enum {

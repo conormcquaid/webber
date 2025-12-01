@@ -69,7 +69,7 @@ void i2c_master_init()
 
 	inverse_mode = false;
   
-    printf("i2c_master_bus_add_device success\n");
+    ESP_LOGI(TAG, "i2c_master_bus_add_device success\n");
 }
 
 

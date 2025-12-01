@@ -15,6 +15,8 @@
 esp_err_t init_sd(tv_runtime_status_t* pRT);
 
 int get_next_valid_file(bool loop, int resolution);
+int get_previous_valid_file(bool loop, int resolution);
+int get_next_random_file(bool loop, int resolution);
 
 int getFrame(uint8_t * pFrame);
 

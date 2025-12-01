@@ -25,6 +25,7 @@
 #include "main.h"
 
 static const char* TAG = "sdcard";
+static const char* gnvfTAG = "gnvf";
 
 #define MOUNT_POINT "/sdcard"
 
@@ -36,66 +37,16 @@ int file_count = 0;
 static uint32_t frame_number = 0;
 static struct stat st;
 char filepath[260];
+static int gnvfCount = 0; // get_next_valid_file file count
 
 
-// int get_next_valid_file(bool loop, int resolution){
-
-//     bool file_found = true;
-//     bool looped = false;
-//     while(!file_found && !looped){
-
-//         struct dirent* dint = readdir(dirp);
-//         if(dint == NULL){
-//             if(loop){
-//                 looped = true;
-//                 rewinddir(dirp);
-//                 dint = readdir(dirp);
-//                 if(dint == NULL){
-//                     ESP_LOGE(TAG, "No files found on sdcard");
-//                     return 0;
-//                 }
-//             } else {
-//                 ESP_LOGI(TAG, "No more files found on sdcard");
-//                 return 0;
-//             }
-//         }
-//         if(dint->d_type == DT_REG){
-
-//             if(stat(dint->d_name, &st) == 0){
-
-//                 if(resolution){
-//                     if(st.st_size % resolution == 0){
-//                         file_found = true;
-//                     } 
-//                 } else {
-//                     file_found = true;  
-//                 }
-//                 if(file_found){
-
-//                     pRuntime->file_size_bytes = st.st_size;
-//                     pRuntime->frame_number = 0;
-//                     pRuntime->file_frame_count = 0;
-//                     strncpy(pRuntime->current_file, dint->d_name, 260);
-
-//                     ESP_LOGI(TAG, "Found valid file %s, size %ld", dint->d_name, st.st_size);
-//                 } else {
-//                     f = fopen(dint->d_name, "r");
-//                     if(f == NULL){
-//                         ESP_LOGE(TAG, "Failed to open file %s", dint->d_name);
-//                         file_found = false;
-//                     } else {
-//                         ESP_LOGI(TAG, "Opened file %s, size %ld", dint->d_name, st.st_size);
-//                         return 1;
-//                     }
-//                 }
-//         } else {
-//            // ESP_LOGI(TAG, "Ignoring non-file item: %s", dint->d_name);
-//         }
-    
-//     }
-//     }
-//     return 0; // no luck
-// }
+/*
+Finds and opens the next valid file.
+If loop is false, stops at end of current directory, otherwise will loop 
+back to start, facilitataing 'find previous'
+If resolution is not 0, the found file must be a multiple of that resolution
+Returns 1 if a file was found and opened, else 0
+*/
 
 int get_next_valid_file(bool loop, int resolution){
 
@@ -111,11 +62,11 @@ int get_next_valid_file(bool loop, int resolution){
                 rewinddir(dirp);
                 dint = readdir(dirp);
                 if(dint == NULL){
-                    ESP_LOGI(TAG,   "==>No files found on sdcard\n");
+                    ESP_LOGI(gnvfTAG,   "==>No files found on sdcard\n");
                     return 0;
                 }
             } else {
-                ESP_LOGI(TAG,   "==>No more files found on sdcard\n");
+                ESP_LOGI(gnvfTAG,   "==>No more files found on sdcard\n");
                 return 0;
             }
         }
@@ -134,19 +85,25 @@ int get_next_valid_file(bool loop, int resolution){
                 }
                 if(file_found){
                     
-                    //printf( "Found valid file %s, size %ld\n", dint->d_name, st.st_size);
+                    ESP_LOGI(gnvfTAG, "Found valid file %s, size %ld\n", dint->d_name, st.st_size);
                     pRuntime->file_size_bytes = st.st_size;
                     pRuntime->frame_number = 0;
                     //pRuntime->file_frame_count = 0;
                     strncpy(pRuntime->current_file, dint->d_name, 260);
+
+                    if(f){
+                        fclose(f);
+                        f = NULL;
+                        ESP_LOGI(gnvfTAG, " Closed previous file");
+                    }
                     
                     f = fopen(filepath, "r");
                     if(f == NULL){
-                        ESP_LOGI(TAG,  "==>Failed to open file %s\n", dint->d_name);
+                        ESP_LOGI(gnvfTAG,  "==>Failed to open file %s\n", dint->d_name);
                         file_found = false;
                     } else {
-                        //printf( "Opened file %s, size %ld\n", dint->d_name, st.st_size);
-                        fclose(f);
+                        ESP_LOGI(gnvfTAG, "Opened file %s, size %ld\n", dint->d_name, st.st_size);
+                        //fclose(f);
                         return 1;
                     }
                     
@@ -158,6 +115,32 @@ int get_next_valid_file(bool loop, int resolution){
     return 0; // no luck
 }
 
+int get_previous_valid_file(bool loop, int resolution){
+    if(gnvfCount == 0){
+        ESP_LOGI(gnvfTAG, "No previous file: count is zero");
+        return 0; 
+    }
+    if(gnvfCount == 1){
+        ESP_LOGI(gnvfTAG, "No previous file: count is one");
+        return 0; 
+    }
+    for(int i = 0; i < (gnvfCount - 1); i++){
+        get_next_valid_file(loop, resolution);
+    }
+    return 1;
+}   
+
+int get_next_random_file(bool loop, int resolution){
+    if(gnvfCount < 2){
+        ESP_LOGI(gnvfTAG, "No random file: count is less than two");
+        return 0; 
+    }
+    int r = rand() % (gnvfCount-1); // don't want to get the same file again
+    for(int i = 0; i < r; i++){
+        get_next_valid_file(loop, resolution);
+    }
+    return 1;
+}
 
 void enumerate_files(void){
     struct dirent* dint;
@@ -296,10 +279,30 @@ esp_err_t init_sd(tv_runtime_status_t* pRT){
         return ESP_ERR_NOT_FOUND;
     }
     // Enumerate files in the directory
-    enumerate_files();
+    //enumerate_files();
 
     //rewind 
     rewinddir(dirp);
+
+
+    // int gnvfCount = 0;
+    // while((get_next_valid_file(false, 54)) != 0){
+    //     ESP_LOGI(gnvfTAG, "[%02d] %s\n", gnvfCount, pRuntime->current_file);
+    //     gnvfCount++;
+    // }
+    // rewinddir(dirp);
+
+    // get_next_valid_file(true, 54);
+    // ESP_LOGI(gnvfTAG, "%s should be the first file", pRuntime->current_file);
+
+    // get_next_valid_file(true, 54);
+    // ESP_LOGI(gnvfTAG, "%s should be the second file", pRuntime->current_file);
+
+    // for(int i = 0; i <(gnvfCount-1); i++){
+    //     get_next_valid_file(true, 54);
+    // }
+    // ESP_LOGI(gnvfTAG, "%s should be the first file again", pRuntime->current_file);
+
 
     return ESP_OK;
 }
@@ -324,11 +327,11 @@ int getFrame(uint8_t * pFrame){
 	
 	//char num[16];
 	//sprintf(num, "%d", frame_number);
-    if((frame_number % 32) == 0){
-        uint8_t pct = (100.0 * frame_number) / pRuntime->file_frame_count ;
-         printf("Frame: %04ld / %04ld %d %%\n", pRuntime->frame_number, pRuntime->file_frame_count, pct);
-         //pRuntime->frame_number = frame_number;
-    }
+    // if((frame_number % 32) == 0){
+    //     uint8_t pct = (100.0 * frame_number) / pRuntime->file_frame_count ;
+    //      printf("Frame: %04ld / %04ld %d %%\n", pRuntime->frame_number, pRuntime->file_frame_count, pct);
+    //      //pRuntime->frame_number = frame_number;
+    // }
 
 	//OLED_WriteBig(num,2,0);
 	

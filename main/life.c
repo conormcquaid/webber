@@ -2,16 +2,38 @@
 Implements Conway's Game of life on 6*9 grid
 */
 
-uint8_t life_grid[6*9];
-uint8_t life_grid_tmp[6*9];
+
 #include "tv.h"
 #include "life.h"
 #include "oled_i2c.h"
-#include "ui_state.h"
-#include "modes.h"  
+#include "ui/ui_state.h"
 
-const int grid_width = 9;
-const int grid_height = 6;
+#define GRID_WIDTH (9)
+#define GRID_HEIGHT (6)
+
+static uint8_t life_grid[GRID_WIDTH * GRID_HEIGHT];
+static uint8_t life_grid_tmp[GRID_WIDTH * GRID_HEIGHT];
+
+static int ticks = 0;
+
+void get_signs_of_life(uint8_t** grid){
+    *grid = &life_grid[0];
+}
+
+void life_tick(void){
+
+    if(ticks == 0){
+        life_init();
+        return;
+    }
+    update_grid();
+
+    if(pop_count() == 0){
+        random_seed(9);
+    }
+
+    ticks++;
+}
 
 void life_init(void){
     memset(life_grid, 0, sizeof(life_grid));
@@ -29,8 +51,8 @@ void life_init(void){
 
 void random_seed(int count){
     for(int i = 0; i < count; i++){
-        int x = esp_random() % grid_width;
-        int y = esp_random() % grid_height;
+        int x = rand() % GRID_WIDTH;
+        int y = rand() % GRID_HEIGHT;
         life_grid[ (y*6) + x ] = 1;
     }
 }
@@ -54,8 +76,8 @@ void update_grid(void){
             for(int ny = -1; ny <= 1; ny++){
                 for(int nx = -1; nx <= 1; nx++){
                     if(ny == 0 && nx == 0){ continue; } // skip self
-                    int xx = (x + nx) % grid_width;
-                    int yy = (y + ny) % grid_height;
+                    int xx = (x + nx) % GRID_WIDTH;
+                    int yy = (y + ny) % GRID_HEIGHT;
                     int nidx = (yy*6) + xx;
                     ncount += life_grid[nidx];
                 }

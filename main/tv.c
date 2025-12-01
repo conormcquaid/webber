@@ -2,7 +2,8 @@
 #include "sdcard.h"
 #include "led_strip.h"
 #include "main.h"
-
+#include "creds.h"
+#include "life.h"
 
 static const char* TAG = "teevee";
 
@@ -100,7 +101,7 @@ TaskHandle_t tv_init(tv_runtime_status_t* pTV_status){
 
     TaskHandle_t hTV;
 
-    xTaskCreatePinnedToCore(tv_task, "tv_task", 4096, pTV_status, configMAX_PRIORITIES-3, &hTV, 1);
+    xTaskCreatePinnedToCore(tv_task, "tv_task", 4096, pTV_status, configMAX_PRIORITIES-4, &hTV, 1);
 
     return hTV;
 }
@@ -110,9 +111,34 @@ TaskHandle_t tv_init(tv_runtime_status_t* pTV_status){
 void tv_open_next_file(tv_runtime_status_t* pTV){
 
     // TODO: depends on tv mode being seq, rand, loop
-    open_next_file(pTV);
+    //open_next_file(pTV);
+    if(tv_prefs.mode == TV_MODE_LOOP){
+        return; // stay on current file
+    }else if(tv_prefs.mode == TV_MODE_SEQUENTIAL){
 
-    frame_count = 0;
+        get_next_valid_file(false, tv_hw_config.resolution == TV_RESOLUTION_HIGH ? FRAME_RESOLUTION_HIGH : FRAME_RESOLUTION_LOW);
+    }else if(tv_prefs.mode == TV_MODE_RANDOM){
+        get_next_random_file(true, tv_hw_config.resolution == TV_RESOLUTION_HIGH ?  FRAME_RESOLUTION_HIGH : FRAME_RESOLUTION_LOW);
+    }
+
+    frame_count = 0;  //TODO: eliminate
+
+}
+
+
+void tv_open_previous_file(tv_runtime_status_t* pTV){
+
+    // TODO: depends on tv mode being seq, rand, loop
+    if(tv_prefs.mode == TV_MODE_LOOP){
+        return; // stay on current file
+    }else if(tv_prefs.mode == TV_MODE_SEQUENTIAL){
+        get_previous_valid_file(false, tv_hw_config.resolution == TV_RESOLUTION_HIGH ? FRAME_RESOLUTION_HIGH : FRAME_RESOLUTION_LOW);
+    }else if(tv_prefs.mode == TV_MODE_RANDOM){
+        get_next_random_file(true, tv_hw_config.resolution == TV_RESOLUTION_HIGH ?  FRAME_RESOLUTION_HIGH : FRAME_RESOLUTION_LOW);
+    }
+    //
+
+    frame_count = 0;  //TODO: eliminate
 
 }
 ///////////////////////////////////////////////////////////////////////////////////////////
@@ -235,6 +261,18 @@ void tv_task(void* param){
 
             case TV_MODE_LIFE:
                 // not implemented yet
+                life_tick();
+                uint8_t* pCells = NULL;
+                get_signs_of_life(&pCells);
+                if(!pCells) break;
+                for(int i = 0; i < nLEDs; i++){
+                    if(pCells[i]){
+                        led_strip_set_pixel(led_strip, i, 0, 255, 0);
+                    }else{
+                        led_strip_set_pixel(led_strip, i, 0, 0, 0);
+                    }
+                }
+                led_strip_refresh(led_strip);
 
             break;
 
@@ -293,7 +331,6 @@ void tv_task(void* param){
 
                 for(int i = 0; i < tv_prefs.speed.tweens; i++){
                     interpolate_linear_rgb(i);
-                    //vTaskDelay(pdMS_TO_TICKS(tv_config_block.speed.interframe_millis));
                 }
             }
 
@@ -313,10 +350,16 @@ void tv_task(void* param){
     }
 
 }
-
-void tv_play_file(const char* path);
-void tv_set_mode(tv_mode_t mode);
 void tv_set_state(tv_state_t state);
+void tv_play_file(const char* path);
+void tv_set_mode(tv_mode_t mode){
+    
+    tv_prefs.mode = mode;
+    save_tv_preferences(&tv_prefs);
+
+    ESP_LOGI(TAG, "TV mode set to %d", mode);
+}
+
 
 tv_mode_t tv_get_mode(void){
     
@@ -349,4 +392,13 @@ float tv_get_brightness(void){
 void  tv_set_brightness(float b){
     tv_prefs.brightness = b;
     save_tv_preferences(&tv_prefs);
+}
+
+void tv_goto_next(void){
+    tv_open_next_file(&tv_status);       
+}
+void tv_goto_prev(void){
+
+    tv_open_previous_file(&tv_status);     
+
 }

@@ -34,10 +34,12 @@ extern RGBColor hslToRgb(float h, float s, float l);
 void send_current_file_data(void){
 
     char payload[512]; // fname 260, 
+    float pos = 1.0 * tv_status.frame_number / tv_status.file_frame_count;
+
     snprintf(payload, sizeof payload, "{\"type\":\"NowPlaying\",\
 \"filename\":\"%s\",\
-\"nframes\":%ld,\"frame\":%ld\
-}", tv_status.current_file, tv_status.file_frame_count, tv_status.frame_number);
+\"nframes\":%.1f,\"frame\":%.1f\
+}", tv_status.current_file, 1.0, pos);
     ws_notify(payload);
 }
 
@@ -135,10 +137,17 @@ void supervisor(void* params){
             if(tv_control && cJSON_IsString(tv_control)){
                 ESP_LOGI(TAG, "TV COntrol message: %s", tv_control->valuestring);
 
-                //TODO send dynamic page data, e.g. list of files on sd card
-                // currently playing file
-                // frame size and frame count
-                //cJSON_Delete(tv_control);
+                if(strcmp(tv_control->valuestring, "next") == 0){
+                    tv_goto_next();
+                } else if(strcmp(tv_control->valuestring, "prev") == 0){
+                    tv_goto_prev();
+                } else if(strcmp(tv_control->valuestring, "play") == 0){
+                    tv_set_mode(TV_MODE_SEQUENTIAL); //TODO: remember previous mode
+                } else if(strcmp(tv_control->valuestring, "pause") == 0){
+                    tv_set_mode(TV_MODE_LAMP); //TODO: remember previous mode
+                } else {
+                    ESP_LOGW(TAG, "Unknown TVcontrol command: %s", tv_control->valuestring);
+                }   
 
             }
 

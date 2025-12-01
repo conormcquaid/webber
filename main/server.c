@@ -271,6 +271,8 @@ static esp_err_t set_content_type_from_file(httpd_req_t *req, const char *filena
         return httpd_resp_set_type(req, "text/css");
     } else if (IS_FILE_EXT(filename, ".png")) {
         return httpd_resp_set_type(req, "image/x-icon");
+    } else if (IS_FILE_EXT(filename, ".svg")) {
+        return httpd_resp_set_type(req, "image/svg+xml");
     }
     /* This is a limited set only */
     /* For any other type always set as plain text */
@@ -282,8 +284,7 @@ static esp_err_t spiff_serve(httpd_req_t *req)
 {
     const char *filename = req->uri;
 
-
-    printf("+ root get with fname %s\n",filename);
+    printf("+ root get with fname %s\n",(char*)filename);
 
     if(filename[0] == '/' && filename[1] == '\0'){
         strcat(filename, "index.html");

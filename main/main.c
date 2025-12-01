@@ -1,10 +1,12 @@
 #include <stdio.h>
 
 #include "main.h"
-
+#include "nvs_flash.h"
+#include "nvs.h"
 #include "ui/ui_state.h"
 #include "tv.h"
 
+#include "rotary_encoder.h"
 
 const char* TAG = "main";
 
@@ -108,22 +110,25 @@ void app_main(void)
 {
 
     ESP_LOGI(TAG, "__app main");
+    ESP_ERROR_CHECK(nvs_flash_init());
 
 
 
     TaskHandle_t hSupervisor;
-    xTaskCreatePinnedToCore(supervisor, "supervisor", 10*1024, NULL, tskIDLE_PRIORITY, &hSupervisor, tskNO_AFFINITY);
+    xTaskCreatePinnedToCore(supervisor, "supervisor", 10*1024, NULL, configMAX_PRIORITIES-3, &hSupervisor, tskNO_AFFINITY);
     // TaskHandle_t hTV;
     // xTaskCreate(tv_task, "tv_task", 10*1024, NULL, tskIDLE_PRIORITY, &hTV);
 
     // time suck goes last
 
+    init_rotary_encoder(NULL);
 
 
-    wifi_init_apsta();
+
+    //wifi_init_apsta();
 
     while (1) {
-        vTaskDelay(pdMS_TO_TICKS(500));
+        vTaskDelay(pdMS_TO_TICKS(500000));
 
         //print_real_time_stats(1000 / portTICK_PERIOD_MS);
 

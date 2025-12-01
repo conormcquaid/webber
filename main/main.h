@@ -78,6 +78,7 @@ typedef struct{
     char      ssid[32];
 
 }wifi_status_t;
+extern wifi_status_t wifi_status;
 
 // persistable preferences
 

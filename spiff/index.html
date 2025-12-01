@@ -43,7 +43,7 @@
               <tbody>
 
                   <td style="text-align: right;"><span class="large-char" alt="previous movie" style="text-align: right;" onclick="tv_Control('prev')">⏮</span></td>
-                  <td style="text-align: center;"><img src="play.svg" id="play_pause_img" style="width: 100%; height: 100%;"></td>
+                  <td style="text-align: center;"><img src="./play.svg" id="play_pause_img" style="width: 100%; height: 100%;"></td>
                   <td style="text-align: left;"><span class="large-char" alt="next movie" onclick="tv_Control('next')" >⏭</span></td>
                 </tr>
               </tbody>
@@ -62,9 +62,6 @@
             
         </div>
         </section>
-      
-
-
 
 
     </main>
@@ -108,8 +105,10 @@
                   var cf = document.getElementById('CurrentFile'); 
                   var cp = document.getElementById('progressSlider');
                   cf.value = message.filename;
-                  cp.max   = message.nFrames; 
-                  cp.value = message.frame;
+                  cp.max   = parseFloat(message.nFrames); 
+                  cp.value = parseFloat(message.frame);
+                  console.log(message);
+                  console.log("max "+ parseFloat(message.nFrames)+" frame "+parseFloat(message.frame));
 
 
                 } else if (message.type === 'status_update') {
@@ -146,13 +145,13 @@
 
       
       const play_pause_img = document.getElementById('play_pause_img');
-      var playing = false;
+      var playing = true;
       play_pause_img.onclick = () => {
           if (ws.readyState === WebSocket.OPEN) {
               ws.send(JSON.stringify({ 'TVcontrol': playing ? 'pause' : 'play' }));
               console.log('Sent play/pause click');
               playing = !playing; 
-              play_pause_img.src = playing ? 'pause.svg' : 'play.svg';
+              play_pause_img.src = playing ? './pause.svg' : './play.svg';
           } else {
               console.warn('WebSocket not open for play/pause click');
           }

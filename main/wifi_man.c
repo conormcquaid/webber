@@ -44,9 +44,11 @@ static char* TAG = "Wifi_Man";
 WifiCred* pCredentials;
 uint8_t   nCredentials;
 
+wifi_status_t wifi_status ={0};
+
 extern void websocket_task(void* nada);
 
-//#define COTTAGE
+//#define COTTAGE 99
 /* STA Configuration */
 #ifdef COTTAGE
 #define EXAMPLE_ESP_WIFI_STA_SSID           "NETGEAR06"
@@ -134,7 +136,8 @@ static void wifi_event_handler(void *arg, esp_event_base_t event_base,
         ESP_LOGI(TAG_STA, "===================Got IP:" IPSTR, IP2STR(&event->ip_info.ip));
 
 // TODO: make IP available
-
+        sprintf(wifi_status.ip_addr, IPSTR, IP2STR(&event->ip_info.ip));
+        
         s_retry_num = 0;
         xEventGroupSetBits(s_wifi_event_group, WIFI_CONNECTED_BIT);
     }
@@ -168,12 +171,18 @@ esp_netif_t *wifi_init_softap(void)
     ESP_LOGI(TAG_AP, "wifi_init_softap finished. SSID:%s password:%s channel:%d",
              EXAMPLE_ESP_WIFI_AP_SSID, EXAMPLE_ESP_WIFI_AP_PASSWD, EXAMPLE_ESP_WIFI_CHANNEL);
 
+    memcpy(wifi_status.ssid, EXAMPLE_ESP_WIFI_STA_SSID, 32);
+
+
     return esp_netif_ap;
 }
 
 /* Initialize wifi station */
 esp_netif_t *wifi_init_sta(void)
 {
+    memset(&wifi_status,0,sizeof(wifi_status_t));
+    memcpy(wifi_status.ssid, EXAMPLE_ESP_WIFI_STA_SSID, 32);
+
     esp_netif_t *esp_netif_sta = esp_netif_create_default_wifi_sta();
 
     wifi_config_t wifi_sta_config = {
@@ -277,8 +286,6 @@ void wifi_init_apsta(void){
         ESP_LOGI(TAG_STA, "connected to ap SSID:%s password:%s",
                  EXAMPLE_ESP_WIFI_STA_SSID, EXAMPLE_ESP_WIFI_STA_PASSWD);
 ////////////////////////////////////////////////        
-///////////////////////////////////////////////////////////////////
-
 softap_set_dns_addr(esp_netif_ap,esp_netif_sta);
 
     } else if (bits & WIFI_FAIL_BIT) {

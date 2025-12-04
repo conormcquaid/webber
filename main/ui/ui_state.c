@@ -780,15 +780,15 @@ void mode_tick(int milliseconds){
 }
 void mode_render(void){
 
-    OLED_fill2(8,   8 + 31, 0, 3, seq,      (mode_choice != TV_MODE_SEQUENTIAL) );
-    OLED_fill2(48, 48 + 31, 0, 3, loop,     (mode_choice != TV_MODE_LOOP) );
-    OLED_fill2(88, 88 + 31, 0, 3, randmode, (mode_choice != TV_MODE_RANDOM) );
+    OLED_fill2(8,   8 + 31, 0, 3, seq,      (mode_choice == TV_MODE_SEQUENTIAL) );
+    OLED_fill2(48, 48 + 31, 0, 3, loop,     (mode_choice == TV_MODE_LOOP) );
+    OLED_fill2(88, 88 + 31, 0, 3, randmode, (mode_choice == TV_MODE_RANDOM) );
     
-    OLED_fill2(8,   8 + 31, 4, 7, lamp, (mode_choice != TV_MODE_LAMP) );
-    OLED_fill2(48, 48 + 31, 4, 7, life, (mode_choice == TV_MODE_LIFE) );
+    OLED_fill2(8,   8 + 31, 4, 7, lamp, (mode_choice == TV_MODE_LAMP) );
+    OLED_fill2(48, 48 + 31, 4, 7, life, (mode_choice != TV_MODE_LIFE) );
     //OLED_fill2(88, 88 + 31, 4, 7, NULL, (mode_choice != TV_MODE_OFF) );
 
-    OLED_WriteBig("OFF", 5, 9, (mode_choice != TV_MODE_OFF));
+    OLED_WriteBig("OFF", 5, 9, (mode_choice == TV_MODE_OFF));
 
     // w = 128. (32 * 3) = 96. 128 - 96 = 32. 32 /4 = 8
     // [8] [32] [8] [32] [8] [32] [8]

@@ -18,6 +18,11 @@ except Exception as e:
 
 print(f"/* Image: {fname}, width {width}, height {height} */")
 
+print(f"/* Mode is {img.mode} */")
+
+is_binary = img.mode == '1'
+
+#print(f"Binary {is_binary}")
 
 #print(f"uint8_t {fname.replace('.','_')}[{ int(width * height / 8)}] = ", '{')
 
@@ -30,12 +35,20 @@ for y in range(0, height>>3):
     for x in range (0, width):
         val = 0
         for bit in range(0,8):
-            if has_alpha:
-                (r,g,b,a) = img.getpixel( (x,(y*8)+bit) )
-            else:
-                (r,g,b) = img.getpixel( (x,(y*8)+bit) )
-            if( (r+g+b)/3 < 128):
-                val = val | (1 << bit)
+        
+            if is_binary:
+                if img.getpixel( (x,(y*8)+bit) ) > 0:
+                    val = val | (1 << bit)
+            
+            else: # assume mode is 'RGB' for now
+                if has_alpha:
+                    (r,g,b,a) = img.getpixel( (x,(y*8)+bit) )
+                else:
+                    (r,g,b) = img.getpixel( (x,(y*8)+bit) )
+                
+                
+                if( (r+g+b)/3 < 128):
+                    val = val | (1 << bit)
         print(f' 0x{val:02x}', end=",")
         # if x != (width-1):
         #     print(',')
